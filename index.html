@@ -531,6 +531,30 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 .rc > span:last-child{font-family:var(--f-num);font-weight:700;text-align:right}
 #bragText{white-space:pre-wrap;user-select:text;-webkit-user-select:text;background:var(--lav);padding:8px;border-radius:10px;margin:0;font-family:var(--f-cute)}
 .achline{background:var(--sun)!important;border:1.5px solid var(--ink);font-weight:900}
+
+/* ---------- 嘴砲：大泡泡 + 上方橫幅 ---------- */
+.bubble.emo{background:var(--sun);border:2.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink);padding:5px 12px;z-index:8;animation:emoFade 3s ease-out forwards;white-space:nowrap}
+.bubble.emo:after{border-top-color:var(--ink);bottom:-8px}
+.bubble.emo.talk{background:#fff}
+.bubble.emo .ein{display:inline-block;font-size:17px;font-weight:900;animation:emoBounce .55s cubic-bezier(.3,1.6,.5,1) both}
+.bubble.emo.talk .ein{color:var(--pink-deep)}
+@keyframes emoFade{0%,85%{opacity:1}100%{opacity:0}}
+@keyframes emoBounce{0%{transform:scale(.2) rotate(-12deg)}60%{transform:scale(1.2) rotate(4deg)}100%{transform:scale(1) rotate(0)}}
+#mjMeInfo{position:relative}
+#mjMeInfo .bubble.emo{left:24px;transform:translateY(-100%)}
+.mjopp .bubble.emo{top:-4px}
+#emoBanner{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 56px);transform:translate(-50%,-160%);z-index:35;display:flex;align-items:center;gap:10px;
+  background:#fff;border:3px solid var(--ink);border-radius:18px;box-shadow:5px 5px 0 var(--ink);padding:6px 16px 6px 6px;max-width:calc(100% - 40px);pointer-events:none;opacity:0;transition:transform .35s cubic-bezier(.3,1.5,.5,1),opacity .2s}
+#emoBanner.show{transform:translate(-50%,0) rotate(-2deg);opacity:1}
+#emoBanner .eav{width:44px;height:44px;border-radius:50%;border:2.5px solid var(--ink);background:linear-gradient(160deg,#fff,#DDE6FF);display:grid;place-items:center;flex:none}
+#emoBanner .eav svg{width:40px;height:40px}
+#emoBanner .etx{display:flex;flex-direction:column;min-width:0}
+#emoBanner small{font-size:12px;font-weight:700;color:var(--ink-soft)}
+#emoBanner b{font-size:22px;font-weight:900;font-style:italic;color:var(--pink);-webkit-text-stroke:1px var(--ink);paint-order:stroke fill;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#emoBar{gap:7px;padding-block:2px 4px}
+#emoBar button{background:var(--sun);font-size:14px;padding:6px 13px;font-weight:900}
+#emoBar button:active{transform:translateY(2px);box-shadow:0 0 0 var(--ink)}
+#emoBar.cool button{opacity:.45}
 </style>
 </head>
 <body>
@@ -722,8 +746,8 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
       ・2 人每人 26 張、3 人每人 17 張（多的 1 張給拿梅花 3 的人）、4 人每人 13 張。<br>
       ・拿到梅花 3 的人先出，第一手要包含梅花 3。<br>
       ・大小：2 &gt; A &gt; K … &gt; 3；花色 ♠ &gt; ♥ &gt; ♦ &gt; ♣。<br>
-      ・牌型：單張、對子，以及五張的順子、同花、葫蘆。三條不能單獨出。<br>
-      ・五張的牌只能壓同一種牌型：順子壓順子、同花壓同花、葫蘆壓葫蘆，不能互壓。<br>
+      ・牌型：單張、對子，以及五張的順子、葫蘆。沒有同花，三條也不能單獨出。<br>
+      ・五張的牌只能壓同一種牌型：順子壓順子、葫蘆壓葫蘆，不能互壓。<br>
       ・順子不能繞：A2345 最小，23456 最大。一樣的順子比第一張的花色（34567 比 3）。<br>
       ・鐵支（四條帶一張）、同花順是炸彈，可以壓任何牌；同花順比鐵支大。<br>
       ・大家都過，最後出牌的人重新自由出牌。出完牌的順序就是名次。
@@ -783,6 +807,7 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
   </div>
 </div>
 
+<div id="emoBanner" aria-live="polite"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="fx"></div>
 

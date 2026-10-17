@@ -43,7 +43,7 @@
     if (st && flush) return mk('sflush', c, [st.order, st.firstSuit]);
     if (g[0][1] === 4) return mk('four', c, [g[0][0]]);
     if (g[0][1] === 3 && g[1][1] === 2) return mk('fullhouse', c, [g[0][0]]);
-    if (flush) return mk('flush', c, [...c].reverse());
+    // 這裡的玩法沒有同花：五張同花色但不是順子，不算牌型
     if (st) return mk('straight', c, [st.order, st.firstSuit]);
     return null;
   }
@@ -98,10 +98,6 @@
       if (g.length === 4) h.forEach(k => { if (rk(k) !== +r) add([...g, k]); });
     }
     trips.forEach(t => pairs.forEach(p => { if (rk(p[0]) !== rk(t[0])) add([...t, ...p]); }));
-    for (let s = 0; s < 4; s++) {
-      const g = h.filter(i => su(i) === s);
-      if (g.length >= 5) kComb(g, 5).forEach(add);
-    }
     const byN = {};
     h.forEach(i => (byN[nat(rk(i))] = byN[nat(rk(i))] || []).push(i));
     const pats = [[1, 2, 3, 4, 5], [2, 3, 4, 5, 6], [10, 11, 12, 13, 1]];

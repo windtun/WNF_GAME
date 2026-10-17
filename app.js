@@ -32,6 +32,7 @@ const Snd = {
   bomb(){ this.tone(170,.7,{type:'sawtooth',vol:.14,to:40}); this.noise(.55,{freq:500,vol:.45}); },
   last(){ [660,880,660,880].forEach((f,i)=>this.tone(f,.09,{type:'square',vol:.05,at:i*.1})); },
   tile(){ this.tone(1900,.03,{type:'square',vol:.04}); this.noise(.07,{freq:1400,vol:.3,q:2}); },
+  emo(){ this.tone(520,.09,{type:'triangle',vol:.12,to:880}); this.tone(990,.12,{type:'triangle',vol:.1,at:.09,to:1320}); },
   join(){ [660,990].forEach((f,i)=>this.tone(f,.14,{type:'triangle',vol:.1,at:i*.09})); },
   win(){ [523,659,784,1047,1319].forEach((f,i)=>this.tone(f,.24,{type:'triangle',vol:.13,at:i*.11})); },
   lose(){ [440,370,311,262].forEach((f,i)=>this.tone(f,.26,{type:'triangle',vol:.11,at:i*.17})); },
@@ -159,11 +160,11 @@ const MockNet = {
   host(code, h){
     const bc=new BroadcastChannel('jk-mock-'+code), conns={};
     bc.onmessage=e=>{ const m=e.data; if(m.to!=='host') return;
-      if(m.k==='hello'){ const w=wrap(o=>bc.postMessage({to:m.from,k:'d',d:o}), ()=>bc.postMessage({to:m.from,k:'bye'})); conns[m.from]=w; bc.postMessage({to:m.from,k:'ok'}); h.conn(w); }
+      if(m.k==='hello'){ const w=wrap(o=>{ try{ bc.postMessage({to:m.from,k:'d',d:o}); }catch(e){} }, ()=>{ try{ bc.postMessage({to:m.from,k:'bye'}); }catch(e){} }); conns[m.from]=w; bc.postMessage({to:m.from,k:'ok'}); h.conn(w); }
       else if(m.k==='d') conns[m.from]&&conns[m.from]._d&&conns[m.from]._d(m.d);
       else if(m.k==='bye'){ const w=conns[m.from]; delete conns[m.from]; w&&w._c&&w._c(); } };
     setTimeout(()=>h.ready(), 50);
-    return { close(){ Object.keys(conns).forEach(k=>bc.postMessage({to:k,k:'bye'})); bc.close(); } };
+    return { close(){ try{ Object.keys(conns).forEach(k=>bc.postMessage({to:k,k:'bye'})); bc.close(); }catch(e){} } };
   },
   join(code, h){
     const bc=new BroadcastChannel('jk-mock-'+code), id='c'+Math.random().toString(36).slice(2); let w=null;
@@ -342,7 +343,7 @@ function applyAct(si, a){
 }
 function hostEmo(si, e){
   const m={t:'emo', by:si, e:String(e).slice(0,12)};
-  H.conns.forEach(w=>w.send(m)); showEmo(si, m.e);
+  H.conns.forEach(w=>w.send(m)); showEmo(si, m.e, true);
 }
 
 /* ================= 每個玩家的畫面（房主自己也是） ================= */
@@ -572,7 +573,7 @@ function updateButtons(){
 }
 
 /* 快速選牌 */
-const QTYPES=[['sflush','同花順',1],['four','鐵支',1],['fullhouse','葫蘆'],['flush','同花'],['straight','順子'],['pair','對子']];
+const QTYPES=[['sflush','同花順',1],['four','鐵支',1],['fullhouse','葫蘆'],['straight','順子'],['pair','對子']];
 let qCache={key:'',list:[]};
 function quickCombos(){
   const V=C.V, mine=V.turn===V.me && !V.over && !V.done[V.me];
@@ -653,16 +654,31 @@ setInterval(tick, 500);
 /* 表情 */
 $('emoBar').addEventListener('click', e=>{
   const b=e.target.closest('button'); if(!b||!C||!C.V) return;
+  const now=Date.now(); if(now-(C.emoAt||0)<1500) return; C.emoAt=now;
+  $('emoBar').classList.add('cool'); setTimeout(()=>$('emoBar').classList.remove('cool'),1500);
   const t=b.textContent; Snd.tap();
   if(C.mode==='guest'){ C.conn && C.conn.send({t:'emo', e:t}); }
   else if(H) hostEmo(C.me, t);
 });
-function showEmo(pi, text){
+function showEmo(pi, text, banner){
   if(!C||!C.V) return;
-  const el = pi===C.V.me ? $('me').querySelector('.meinfo') : $('seat'+D(pi));
-  if(!el) return;
-  const b=document.createElement('div'); b.className='bubble emo'; b.textContent=text;
-  el.appendChild(b); setTimeout(()=>b.remove(), 2200);
+  const V=C.V, mj=V.type==='mj', me=pi===V.me;
+  const el = mj ? (me ? $('mjMeInfo') : $('mjo'+pi)) : (me ? $('me').querySelector('.meinfo') : $('seat'+D(pi)));
+  if(el){
+    el.querySelectorAll('.bubble.emo').forEach(x=>x.remove());
+    const b=document.createElement('div'); b.className='bubble emo'+(banner?' talk':'');
+    b.innerHTML=`<span class="ein">${esc(text)}</span>`;
+    el.appendChild(b); setTimeout(()=>b.remove(), 3000);
+  }
+  if(banner){
+    Snd.emo();
+    if(!me){
+      const p=V.players[pi], bn=$('emoBanner');
+      bn.innerHTML=`<span class="eav">${avatar(p.kind)}</span><span class="etx"><small>${esc(p.name)}</small><b>${esc(text)}</b></span>`;
+      bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
+      clearTimeout(showEmo._t); showEmo._t=setTimeout(()=>bn.classList.remove('show'), 2800);
+    }
+  }
 }
 
 /* 結算 */
@@ -1219,7 +1235,7 @@ function guestConnect(attempt){
       w.onData(m=>{ if(C!==my||!m) return;
         if(m.t==='lobby') showLobby(m.L);
         else if(m.t==='state') applyView(m.V);
-        else if(m.t==='emo') showEmo(m.by, m.e);
+        else if(m.t==='emo') showEmo(m.by, m.e, true);
         else if(m.t==='err'){ toast(m.msg); Snd.err(); if(m.fatal){ my.leaving=true; exitToMenu(); } }
         else if(m.t==='closed'){ my.leaving=true; toast('房主關掉房間了'); exitToMenu(); }
       });
