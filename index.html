@@ -543,18 +543,29 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 #mjMeInfo{position:relative}
 #mjMeInfo .bubble.emo{left:24px;transform:translateY(-100%)}
 .mjopp .bubble.emo{top:-4px}
-#emoBanner{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 56px);transform:translate(-50%,-160%);z-index:35;display:flex;align-items:center;gap:10px;
-  background:#fff;border:3px solid var(--ink);border-radius:18px;box-shadow:5px 5px 0 var(--ink);padding:6px 16px 6px 6px;max-width:calc(100% - 40px);pointer-events:none;opacity:0;transition:transform .35s cubic-bezier(.3,1.5,.5,1),opacity .2s}
-#emoBanner.show{transform:translate(-50%,0) rotate(-2deg);opacity:1}
-#emoBanner .eav{width:44px;height:44px;border-radius:50%;border:2.5px solid var(--ink);background:linear-gradient(160deg,#fff,#DDE6FF);display:grid;place-items:center;flex:none}
-#emoBanner .eav svg{width:40px;height:40px}
-#emoBanner .etx{display:flex;flex-direction:column;min-width:0}
-#emoBanner small{font-size:12px;font-weight:700;color:var(--ink-soft)}
-#emoBanner b{font-size:22px;font-weight:900;font-style:italic;color:var(--pink);-webkit-text-stroke:1px var(--ink);paint-order:stroke fill;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#emoBanner{position:fixed;left:0;right:0;top:38%;height:70px;z-index:35;pointer-events:none;overflow:hidden;
+  background:repeating-linear-gradient(-45deg,var(--pink) 0 16px,#FF73A3 16px 32px);border-block:3px solid var(--ink);box-shadow:0 6px 0 var(--ink);
+  opacity:0;transform:scaleY(0) rotate(-2deg);transition:transform .25s cubic-bezier(.3,1.5,.5,1),opacity .2s}
+#emoBanner.show{opacity:1;transform:scaleY(1) rotate(-2deg)}
+#emoBanner .emq{position:absolute;top:0;bottom:0;left:0;display:flex;align-items:center;gap:12px;white-space:nowrap;padding-right:60px}
+#emoBanner.show .emq{animation:marq 4.2s linear forwards}
+@keyframes marq{from{transform:translateX(100vw)}to{transform:translateX(-100%)}}
+#emoBanner .eav{width:48px;height:48px;border-radius:50%;border:3px solid var(--ink);background:#fff;display:grid;place-items:center;flex:none;margin-left:40px}
+#emoBanner .eav svg{width:44px;height:44px}
+#emoBanner small{font-size:16px;font-weight:900;color:#fff;background:var(--ink);border-radius:8px;padding:2px 8px}
+#emoBanner b{font-size:34px;font-weight:900;font-style:italic;color:var(--sun);-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;text-shadow:3px 3px 0 var(--ink);letter-spacing:.06em}
 #emoBar{gap:7px;padding-block:2px 4px}
 #emoBar button{background:var(--sun);font-size:14px;padding:6px 13px;font-weight:900}
 #emoBar button:active{transform:translateY(2px);box-shadow:0 0 0 var(--ink)}
 #emoBar.cool button{opacity:.45}
+
+/* ---------- LINE 提醒 / 備份 ---------- */
+.linewarn{display:flex;flex-direction:column;gap:6px;background:#FFF1C2;border:2.5px solid var(--ink);border-radius:16px;box-shadow:4px 4px 0 var(--ink);padding:10px 12px}
+.linewarn b{font-weight:900;color:var(--red)}
+.linewarn span{font-size:13px;line-height:1.5}
+.linewarn .candy{text-align:center;text-decoration:none;font-size:16px;padding:10px}
+.bk{font:inherit;font-family:ui-monospace,Menlo,monospace;font-size:11px;width:100%;box-sizing:border-box;border:2.5px solid var(--ink);border-radius:12px;padding:8px;background:var(--lav);color:var(--ink);resize:vertical;word-break:break-all;user-select:text;-webkit-user-select:text}
+.stsheet .rbtns>button{flex:1 1 30%}
 </style>
 </head>
 <body>
@@ -572,6 +583,11 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
       <div><h1>揪咖打牌</h1><p>跟朋友的牌桌，隨時開一局</p></div>
     </div>
 
+    <div class="linewarn" id="lineWarn" hidden>
+      <b>你正在 LINE 裡面開啟</b>
+      <span>LINE 清快取時戰績和金幣可能會不見，建議改用手機的瀏覽器玩。</span>
+      <a class="candy" id="lineOpen" href="#" target="_blank" rel="noopener">用瀏覽器開啟</a>
+    </div>
     <div class="profile">
       <div class="pfav" id="pfAv"></div>
       <div class="pfmid">
@@ -584,7 +600,7 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
     </div>
     <div class="quick3">
       <button class="candy plain" id="btnRank"><span class="qi qi-rank"></span>排行榜</button>
-      <button class="candy plain" id="btnStats"><span class="qi qi-stats"></span>戰績</button>
+      <button class="candy plain" id="btnStats"><span class="qi qi-stats"></span>戰績<i class="dot" id="dotStats" hidden></i></button>
       <button class="candy plain" id="btnDaily"><span class="qi qi-daily"></span>每日<i class="dot" id="dotDaily" hidden></i></button>
       <button class="candy plain" id="btnShop"><span class="qi qi-shop"></span>商店</button>
     </div>
@@ -781,7 +797,22 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
     <h2>我的戰績</h2>
     <div class="stbody" id="statsBody"></div>
     <pre class="stat" id="bragText" hidden></pre>
-    <div class="rbtns"><button class="candy sun" id="btnBrag">複製去炫耀</button><button class="candy" data-close>關閉</button></div>
+    <div class="rbtns"><button class="candy sun" id="btnBrag">複製去炫耀</button><button class="candy plain" id="btnBackup">備份／還原</button><button class="candy" data-close>關閉</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="ovBackup" hidden>
+  <div class="result sheet">
+    <h2>備份戰績</h2>
+    <p class="note">戰績、金幣、段位、買過的東西都存在這支手機的瀏覽器裡。清除瀏覽器資料、換手機、或換成在 LINE 裡開，都會讀不到。先複製下面這段備份碼存起來，需要時貼回來就能還原。</p>
+    <label class="lbl" for="bkCode">你的備份碼</label>
+    <textarea id="bkCode" class="bk" rows="3" readonly></textarea>
+    <button class="candy sun" id="btnBkCopy">複製備份碼</button>
+    <label class="lbl" for="bkPaste">從備份碼還原</label>
+    <textarea id="bkPaste" class="bk" rows="3" placeholder="把之前存的備份碼貼在這裡"></textarea>
+    <button class="candy" id="btnRestore">還原</button>
+    <p class="note">建議：把這個網頁「加入主畫面」，以後都從主畫面的圖示開，資料最不容易被清掉。</p>
+    <button class="candy plain" data-close>關閉</button>
   </div>
 </div>
 

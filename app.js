@@ -672,14 +672,46 @@ function showEmo(pi, text, banner){
   }
   if(banner){
     Snd.emo();
-    if(!me){
-      const p=V.players[pi], bn=$('emoBanner');
-      bn.innerHTML=`<span class="eav">${avatar(p.kind)}</span><span class="etx"><small>${esc(p.name)}</small><b>${esc(text)}</b></span>`;
-      bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
-      clearTimeout(showEmo._t); showEmo._t=setTimeout(()=>bn.classList.remove('show'), 2800);
-    }
+    // 跑馬燈：整條橫跨畫面中間，從右邊跑到左邊
+    const p=V.players[pi], bn=$('emoBanner');
+    bn.innerHTML=`<div class="emq"><span class="eav">${avatar(p.kind)}</span><small>${esc(me?'我':p.name)}</small><b>${esc(text)}</b><span class="eav">${avatar(p.kind)}</span><small>${esc(me?'我':p.name)}</small><b>${esc(text)}</b></div>`;
+    bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
+    clearTimeout(showEmo._t); showEmo._t=setTimeout(()=>bn.classList.remove('show'), 4200);
   }
 }
+
+/* 備份 / 還原 */
+function openBackup(){
+  $('bkCode').value = Prog.exportCode(($('nick').value.trim()||''));
+  $('bkPaste').value=''; $('btnRestore').dataset.arm=''; $('btnRestore').textContent='還原';
+  $('ovBackup').hidden=false;
+}
+$('btnBackup').addEventListener('click', ()=>{ Snd.init(); Snd.tap(); openBackup(); });
+$('btnBkCopy').addEventListener('click', ()=>{
+  const t=$('bkCode').value;
+  const ok=()=>{ Prog.markBackup(); toast('已複製。貼到 LINE 的 Keep 或傳給自己存著'); renderProfile(); };
+  const fb=()=>{ $('bkCode').focus(); $('bkCode').select(); toast('請長按上面的文字，全選後複製'); };
+  try{ navigator.clipboard.writeText(t).then(ok, fb); }catch(e){ fb(); }
+});
+$('btnRestore').addEventListener('click', ()=>{
+  const b=$('btnRestore'), code=$('bkPaste').value.trim();
+  if(!code){ toast('先把備份碼貼到框框裡'); Snd.err(); return; }
+  if(!b.dataset.arm){ b.dataset.arm='1'; b.textContent='確定覆蓋目前的資料？再按一次'; return; }
+  const r=Prog.importCode(code);
+  b.dataset.arm=''; b.textContent='還原';
+  if(r.err){ toast(r.err); Snd.err(); return; }
+  if(r.nick){ $('nick').value=r.nick; store.set('jk_nick', r.nick); }
+  Snd.win(); toast('還原成功，戰績都回來了'); applyTheme(); renderProfile(); $('ovBackup').hidden=true;
+});
+
+/* 在 LINE 裡開啟時提醒改用瀏覽器 */
+(function lineGuard(){
+  const inLine = /\bLine\//i.test(navigator.userAgent);
+  if(!inLine) return;
+  const u = new URL(location.href); u.searchParams.set('openExternalBrowser','1');
+  $('lineWarn').hidden=false; $('lineOpen').href = u.toString();
+})();
+try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 
 /* 結算 */
 function finish(){
@@ -957,6 +989,7 @@ function renderProfile(){
   $('pfStreak').innerHTML = P.streak>1 ? `連勝 <b>${P.streak}</b>` : '';
   $('pfStreak').hidden = P.streak<2;
   $('dotDaily').hidden = !Prog.hasClaimable();
+  $('dotStats').hidden = !Prog.needBackup();
 }
 
 /* 跑馬燈：其他玩家的動態 */
@@ -1140,7 +1173,7 @@ function renderStats(){
 function bragText(){
   const P=Prog.state, st=P.st, t=Prog.tierOf(P.rp), G=st.byGame, tg=G.big2.g+G.seven.g+G.mj.g, tw=G.big2.w+G.seven.w+G.mj.w;
   const name=($('nick').value.trim()||'我');
-  const link = location.protocol.startsWith('http') && !location.hostname.endsWith('claude.ai') && !location.hostname.endsWith('claudeusercontent.com') ? '\n'+location.origin+location.pathname : '';
+  const link = location.protocol.startsWith('http') && !location.hostname.endsWith('claude.ai') && !location.hostname.endsWith('claudeusercontent.com') ? '\n'+location.origin+location.pathname+'?openExternalBrowser=1' : '';
   return `【揪咖打牌】${name} 的戰績\n段位：${t.name} ${P.rp} 分（全服 #${Prog.myRank()}）\n總場數 ${tg}，勝率 ${tg?Math.round(tw/tg*100):0}%，最高連勝 ${P.best}\n麻將最大一把 ${st.mjMaxTai} 台，成就 ${Prog.achState().filter(a=>a.got).length} 個\n敢來挑戰我嗎？${link}`;
 }
 $('btnStats').addEventListener('click', ()=>{ Snd.init(); Snd.tap(); renderStats(); $('ovStats').hidden=false; $('statsBody').scrollTop=0; });
@@ -1199,7 +1232,8 @@ function showLobby(L){
     : '等房主開始遊戲…';
   $('btnCopy').hidden = !isHost;
 }
-function inviteLink(){ return location.origin + location.pathname + '?r=' + (C.code||''); }
+// openExternalBrowser=1：從 LINE 點連結會直接用手機瀏覽器開，戰績才不會存在 LINE 裡
+function inviteLink(){ return location.origin + location.pathname + '?r=' + (C.code||'') + '&openExternalBrowser=1'; }
 
 $('lgChips').addEventListener('click', e=>{ const b=e.target.closest('.chip'); if(!b||!H||H.started) return; H.type=b.dataset.g; prefs.game=H.type; Snd.tap(); broadcastLobby(); });
 $('lnChips').addEventListener('click', e=>{ const b=e.target.closest('.chip'); if(!b||!H||H.started||b.disabled) return; H.n=+b.dataset.n; prefs.n=H.n; Snd.tap(); broadcastLobby(); });
