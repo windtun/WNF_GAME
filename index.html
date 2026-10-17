@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#E6F0FF">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>揪咖打牌</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Noto+Sans+TC:wght@500;700;900&display=swap">
+<style>
+/* 版面：一整個手機畫面的牌桌，上方對手、中間桌面、下方自己的手牌與按鈕 */
+:root{
+  /* 動漫風：粗墨線、硬陰影、網點、集中線 */
+  --ink:#1B1B3A; --ink-soft:#57548A;
+  --felt:#62D5C1; --felt-deep:#2D9E8C; --bg:#E6F0FF;
+  --pink:#FF4F8B; --pink-deep:#C42A64; --sun:#FFD23F; --sun-deep:#D9A100;
+  --paper:#FFFFFF; --line:#1B1B3A; --red:#F0303F; --lav:#EDEFFF; --cyan:#2EC5FF;
+  --f-cute:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:"Fredoka","Noto Sans TC",system-ui,sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-cute);font-weight:500;overflow:hidden;
+  background-image:radial-gradient(circle,rgba(46,197,255,.22) 1.5px,transparent 1.9px),repeating-conic-gradient(from 0deg at 50% -10%,rgba(255,255,255,.65) 0 2.5deg,transparent 2.5deg 8deg);
+  background-size:12px 12px,100% 100%;
+  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#app{height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:720px;margin:0 auto;box-sizing:border-box}
+.screen{flex:1;min-height:0;display:flex;flex-direction:column}
+button{font-family:inherit;color:inherit;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.candy{background:var(--pink);color:#fff;font-size:17px;padding:12px 18px;border-radius:16px;box-shadow:0 4px 0 var(--pink-deep);transition:transform .08s,box-shadow .08s}
+.candy:active{transform:translateY(3px);box-shadow:0 1px 0 var(--pink-deep)}
+.candy.sun{background:var(--sun);color:var(--ink);box-shadow:0 4px 0 var(--sun-deep)}
+.candy.sun:active{box-shadow:0 1px 0 var(--sun-deep)}
+.candy.plain{background:var(--paper);color:var(--ink);box-shadow:0 4px 0 var(--line)}
+.candy.plain:active{box-shadow:0 1px 0 var(--line)}
+.candy:disabled{opacity:.4;transform:none;box-shadow:0 4px 0 rgba(0,0,0,.08);cursor:default}
+
+/* ---------- 大廳 ---------- */
+#menu{overflow-y:auto;padding-block:18px 24px;gap:18px}
+.logo{display:flex;align-items:center;gap:12px}
+.logo svg{width:64px;height:64px;flex:none}
+.logo h1{margin:0;font-size:32px;letter-spacing:.06em;line-height:1.1}
+.logo p{margin:2px 0 0;color:var(--ink-soft);font-size:14px}
+.panel{background:var(--paper);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:14px;box-shadow:0 3px 0 var(--line)}
+.field{display:flex;flex-direction:column;gap:8px}
+.field>label,.field>.lbl{font-size:13px;color:var(--ink-soft);letter-spacing:.08em}
+#nick{font:inherit;font-size:18px;padding:11px 14px;border-radius:14px;border:2px solid var(--line);background:var(--lav);color:var(--ink);width:100%;box-sizing:border-box}
+#nick:focus{border-color:var(--pink);outline:none}
+.stat{font-size:13px;color:var(--ink-soft);font-family:var(--f-num)}
+.games{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.gcard{background:var(--lav);border-radius:18px;padding:12px;text-align:left;display:flex;flex-direction:column;gap:4px;border:2.5px solid transparent;position:relative}
+.gcard b{font-size:20px}
+.gcard span{font-size:12px;color:var(--ink-soft)}
+.gcard[aria-pressed="true"]{border-color:var(--pink);background:#FFE6EE}
+.gcard:disabled{opacity:.55;cursor:default}
+.gcard .tag{position:absolute;top:10px;right:10px;background:var(--sun);color:var(--ink);font-size:11px;padding:2px 8px;border-radius:99px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--lav);padding:9px 16px;border-radius:99px;font-size:16px;border:2px solid transparent}
+.chip[aria-pressed="true"]{background:var(--ink);color:#fff}
+.note{font-size:13px;color:var(--ink-soft);line-height:1.6;margin:0}
+#btnStart{font-size:20px;padding:15px}
+.menu-foot{display:flex;justify-content:space-between;align-items:center}
+
+/* ---------- 牌桌 ---------- */
+.bar{display:flex;align-items:center;justify-content:space-between;padding-block:8px 4px;gap:8px}
+.bar .candy{font-size:13px;padding:6px 12px;border-radius:12px;box-shadow:0 3px 0 var(--line)}
+.bar .ttl{font-size:16px;letter-spacing:.1em}
+.table{flex:1;min-height:0;display:grid;grid-template-columns:78px 1fr 78px;grid-template-rows:auto 1fr;grid-template-areas:". top ." "left center right";gap:4px}
+.seat{display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;align-self:center}
+.seat.top{grid-area:top}.seat.left{grid-area:left}.seat.right{grid-area:right}
+.table.n2 .seat.top,.table.n4 .seat.top{flex-direction:row;justify-self:center;gap:8px}
+.av{width:48px;height:48px;border-radius:50%;background:var(--paper);display:grid;place-items:center;box-shadow:0 3px 0 var(--line);transition:box-shadow .2s}
+.av svg{width:42px;height:42px}
+.seat.turn .av,#me.turn .av{box-shadow:0 0 0 3px var(--sun),0 0 0 7px rgba(255,209,92,.45);animation:bob 1s ease-in-out infinite}
+.seat.done{opacity:.55}
+.pname{font-size:13px;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cnt{display:flex;align-items:center;gap:4px;font-family:var(--f-num);font-weight:700;font-size:14px}
+.mini{width:15px;height:21px;border-radius:3px;background:var(--pink);background-image:radial-gradient(circle,rgba(255,255,255,.7) 1.3px,transparent 1.6px);background-size:5px 5px;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.bubble{position:absolute;top:-6px;left:50%;transform:translateX(-50%) translateY(-100%);background:var(--paper);padding:3px 10px;border-radius:12px;font-size:13px;white-space:nowrap;box-shadow:0 2px 0 var(--line);z-index:3;animation:pop .25s ease-out}
+.bubble:after{content:"";position:absolute;left:50%;bottom:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:0;border-top-color:var(--paper)}
+.bubble.hot{background:var(--red);color:#fff}
+.bubble.hot:after{border-top-color:var(--red)}
+.seat.left .bubble,.seat.right .bubble{top:-4px}
+.place{font-family:var(--f-num);font-weight:700;background:var(--sun);border-radius:99px;padding:1px 8px;font-size:12px}
+
+#center{grid-area:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-width:0;
+  background:var(--felt);border-radius:999px/60%;margin:4px 0;box-shadow:inset 0 0 0 6px rgba(255,255,255,.45),inset 0 -8px 0 var(--felt-deep);position:relative}
+#tableLabel{font-size:14px;background:rgba(255,255,255,.75);padding:4px 12px;border-radius:99px;text-align:center;max-width:90%}
+#tableCards{display:flex;justify-content:center;min-height:68px;--cw:46px;--ch:66px}
+#tableCards .card{position:relative;margin-left:calc(var(--cw)*-.42)}
+#tableCards .card:first-child{margin-left:0}
+#tableCards.enter{animation:fly .32s cubic-bezier(.2,.8,.3,1.2)}
+.tblkind{font-family:var(--f-num);font-size:12px;color:var(--ink-soft)}
+
+/* ---------- 排七 ---------- */
+.table.seven{grid-template-columns:1fr 1fr 1fr;grid-template-areas:"left top right" "center center center"}
+.table.seven .seat{align-self:start;flex-direction:column!important}
+.table.seven #center{border-radius:28px;margin:6px 0;padding:10px 8px}
+#board{display:flex;flex-direction:column;gap:5px;width:100%;max-width:440px}
+.brow{display:grid;grid-template-columns:22px repeat(13,1fr);gap:2px;align-items:center}
+.brow .bs{font-size:16px;text-align:center;font-family:var(--f-num)}
+.brow .bs.red,.cell.red{color:var(--red)}
+.cell{aspect-ratio:5/7;border-radius:4px;background:rgba(255,255,255,.35);display:grid;place-items:center;font-family:var(--f-num);font-weight:700;font-size:clamp(9px,2.6vw,13px);color:var(--ink);min-width:0}
+.cell.seven{background:rgba(255,255,255,.55);outline:1.5px dashed rgba(45,42,74,.25)}
+.cell.on{background:var(--paper);box-shadow:0 1.5px 0 rgba(45,42,74,.15)}
+.cell.new{animation:pop .35s ease-out;box-shadow:0 0 0 2px var(--pink)}
+.cell.edge{background:rgba(255,209,92,.45)}
+.card.can{border-color:var(--sun);box-shadow:0 0 0 2.5px var(--sun),0 4px 10px rgba(227,174,43,.35);transform:translateY(-8px)}
+.card.dim{filter:grayscale(.6) brightness(.9)}
+.g-seven #quick,.g-seven #btnPass{display:none}
+.g-seven .actions{grid-template-columns:1fr 1fr 1.4fr}
+.g-big2 #board{display:none}
+.g-seven #tableCards,.g-seven #tableKind{display:none}
+
+/* ---------- 自己 ---------- */
+#me{padding-block:6px 4px;display:flex;flex-direction:column;gap:6px}
+.meinfo{display:flex;align-items:center;gap:10px;min-height:40px;position:relative}
+.meinfo .av{width:40px;height:40px}
+.meinfo .av svg{width:34px;height:34px}
+#meName{font-size:15px}
+#meTag{font-size:13px;padding:3px 10px;border-radius:99px;background:var(--paper)}
+#meTag:empty{display:none}
+#meTag.go{background:var(--sun);animation:pulse 1.2s ease-in-out infinite}
+#selInfo{margin-left:auto;font-size:13px;color:var(--ink-soft)}
+#quick{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;min-height:34px;align-items:center}
+#quick::-webkit-scrollbar{display:none}
+.qc{flex:none;background:var(--paper);border-radius:99px;padding:6px 12px;font-size:14px;box-shadow:0 2px 0 var(--line);display:flex;gap:6px;align-items:center}
+.qc i{font-style:normal;font-family:var(--f-num);font-weight:700;font-size:12px;background:var(--lav);border-radius:99px;padding:0 7px}
+.qc.bomb{background:var(--pink);color:#fff;box-shadow:0 2px 0 var(--pink-deep)}
+.qc.bomb i{background:rgba(255,255,255,.3)}
+.qc.on{outline:2.5px solid var(--ink)}
+.qnone{font-size:13px;color:var(--ink-soft)}
+#hand{position:relative;display:flex;flex-direction:column;gap:6px}
+.row{position:relative}
+.card{position:absolute;top:0;width:var(--cw);height:var(--ch);background:var(--paper);border-radius:calc(var(--cw)*.15);border:1.5px solid var(--line);
+  box-shadow:0 2px 0 rgba(45,42,74,.12),0 3px 8px rgba(45,42,74,.12);color:var(--ink);font-family:var(--f-num);box-sizing:border-box;transition:transform .14s ease,box-shadow .14s;cursor:pointer}
+.card .cr{position:absolute;top:5%;left:9%;font-weight:700;font-size:calc(var(--cw)*.36);line-height:1;letter-spacing:-.04em}
+.card .cs{position:absolute;top:36%;left:10%;font-size:calc(var(--cw)*.3);line-height:1}
+.card .cb{position:absolute;right:8%;bottom:5%;font-size:calc(var(--cw)*.5);line-height:1}
+.card.red{color:var(--red)}
+.card.sel{transform:translateY(-14px);border-color:var(--pink);box-shadow:0 0 0 2px var(--pink),0 6px 12px rgba(218,90,130,.3)}
+#hand.deal .card{animation:dealIn .35s backwards}
+.actions{display:grid;grid-template-columns:1fr 1fr 1fr 1.4fr;gap:8px;padding-block:8px 10px}
+.actions .candy{font-size:16px;padding:11px 6px}
+
+/* ---------- 連線 / 房間 ---------- */
+#netPanel.invited{box-shadow:0 0 0 3px var(--pink),0 3px 0 var(--line)}
+.joinrow{display:grid;grid-template-columns:1fr auto;gap:8px}
+#joinCode{font:inherit;font-family:var(--f-num);font-size:22px;letter-spacing:.3em;text-align:center;padding:9px 10px;border-radius:14px;border:2px solid var(--line);background:var(--lav);color:var(--ink);min-width:0}
+#joinCode:focus{border-color:var(--pink);outline:none}
+#lobby{overflow-y:auto;padding-block:0 20px;gap:14px}
+.codebox{text-align:center;display:flex;flex-direction:column;gap:2px}
+.codebox span{font-size:13px;color:var(--ink-soft);letter-spacing:.1em}
+#roomCode{font-family:var(--f-num);font-weight:700;font-size:48px;letter-spacing:.18em;line-height:1.1}
+#linkText{word-break:break-all;user-select:text;-webkit-user-select:text;text-align:center}
+#lobbySeats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lseat{display:flex;align-items:center;gap:8px;background:var(--lav);border-radius:16px;padding:8px;min-width:0}
+.lseat .av{width:38px;height:38px;box-shadow:none;flex:none}
+.lseat .av svg{width:32px;height:32px}
+.lseat .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lseat.bot{opacity:.7}
+.pill{font-size:11px;background:var(--paper);border-radius:99px;padding:2px 8px;flex:none}
+.chip:disabled{opacity:.45;cursor:default}
+.off{font-size:11px;background:var(--ink);color:#fff;border-radius:99px;padding:1px 6px;margin-left:4px}
+.tleft{font-family:var(--f-num);font-weight:700;font-size:12px;background:var(--sun);border-radius:99px;padding:0 7px;margin-left:4px;min-width:14px;text-align:center}
+.tleft:empty{display:none}
+.tleft.hurry{background:var(--red);color:#fff}
+#emoBar{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+#emoBar::-webkit-scrollbar{display:none}
+#emoBar button{flex:none;background:var(--paper);border-radius:99px;padding:5px 11px;font-size:13px;box-shadow:0 2px 0 var(--line)}
+.bubble.emo{background:var(--sun);font-size:14px}
+.bubble.emo:after{border-top-color:var(--sun)}
+.meinfo .bubble.emo{left:20px;transform:translateY(-100%)}
+
+/* ---------- 麻將 ---------- */
+#mj{display:none;flex:1;min-height:0;flex-direction:column;gap:6px;padding-block:2px 8px}
+.g-mj #mj{display:flex}
+.g-mj #table,.g-mj #me,.g-mj .actions{display:none}
+.tile{--tw:26px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:var(--tw);height:calc(var(--tw)*1.36);box-sizing:border-box;
+  background:#FFFDF4;border:1px solid #E6DCC3;border-radius:calc(var(--tw)*.17);box-shadow:0 calc(var(--tw)*.09) 0 var(--felt-deep);line-height:1;vertical-align:middle;flex:none;position:relative;font-family:var(--f-cute)}
+.tile b{font-weight:400;font-size:calc(var(--tw)*.56)}
+.tile i{font-style:normal;font-size:calc(var(--tw)*.36);margin-top:calc(var(--tw)*.04)}
+.tile.s0 i{color:var(--red)}
+.tile.s1 b,.tile.s1 i{color:#2B66CF}
+.tile.s2 b,.tile.s2 i{color:#1C8B50}
+.tile.h4 b{color:var(--red)}
+.tile.h5 b{color:#1C8B50}
+.tile .bai{width:calc(var(--tw)*.5);height:calc(var(--tw)*.7);border:2px solid #2B66CF;border-radius:3px;box-sizing:border-box}
+.tile.fl b,.tile.fl i{color:#C24F93}
+.tile.back{background:var(--pink);background-image:radial-gradient(circle,rgba(255,255,255,.6) 1.2px,transparent 1.5px);background-size:5px 5px;border-color:#fff}
+.tile.xs{--tw:17px}.tile.sm{--tw:22px}.tile.big{--tw:34px}
+.tile.win{box-shadow:0 0 0 2px var(--sun),0 calc(var(--tw)*.09) 0 var(--felt-deep)}
+#mjInfo{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-soft)}
+#mjInfo b{color:var(--ink);font-family:var(--f-num)}
+#mjOpps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.mjopp{background:rgba(255,255,255,.6);border-radius:14px;padding:6px;display:flex;flex-direction:column;gap:4px;min-width:0;position:relative}
+.mjopp.turn{box-shadow:0 0 0 2.5px var(--sun)}
+.mjoh{display:flex;gap:6px;align-items:center;min-width:0}
+.mjoh .av{width:34px;height:34px;flex:none;box-shadow:none}.mjoh .av svg{width:30px;height:30px}
+.mjon{min-width:0;flex:1}
+.mjon .pname{font-size:12px;max-width:100%}
+.mjtags{display:flex;align-items:center;gap:3px;font-family:var(--f-num);font-size:12px;font-weight:700;flex-wrap:wrap}
+.mjtags .mini{width:10px;height:14px}
+.wind{font-family:var(--f-cute);font-weight:400;background:var(--lav);border-radius:6px;padding:0 4px;font-size:11px}
+.wind.dealer{background:var(--red);color:#fff}
+.fl{font-family:var(--f-cute);font-weight:400;color:#C24F93;font-size:11px}
+.sc{font-family:var(--f-num);font-size:11px;color:var(--ink-soft)}
+.mjm{display:flex;flex-wrap:wrap;gap:3px}
+.mjm .tile{--tw:15px}
+.meld{display:inline-flex;gap:1px;margin-right:2px}
+#mjRiver{flex:1;min-height:90px;overflow-y:auto;background:var(--felt);border-radius:22px;padding:8px 10px;box-shadow:inset 0 0 0 5px rgba(255,255,255,.45),inset 0 -6px 0 var(--felt-deep);display:flex;flex-direction:column;gap:8px}
+#mjLast{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;min-height:48px;background:rgba(255,255,255,.7);border-radius:14px;padding:4px 10px;align-self:center}
+#mjPool{display:flex;flex-wrap:wrap;gap:4px 2px;align-content:flex-start}
+#mjPool .tile{--tw:21px;box-shadow:0 1.5px 0 var(--felt-deep)}
+#mjPool .tile.new{box-shadow:0 0 0 2px var(--pink)}
+#mjPool .tile.p0{background:#FFF6E9}
+.mjempty{font-size:13px;color:var(--ink-soft);margin:auto}
+#mjMeRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#mjMeInfo{display:flex;align-items:center;gap:6px;font-size:14px}
+#mjMeInfo .av{width:32px;height:32px;box-shadow:none}#mjMeInfo .av svg{width:28px;height:28px}
+#mjMeInfo .go{background:var(--sun);border-radius:99px;padding:2px 10px;font-size:13px;animation:pulse 1.2s ease-in-out infinite}
+#mjMelds{display:flex;flex-wrap:wrap;gap:3px;margin-left:auto}
+#mjMelds .tile{--tw:20px}
+#mjTing{min-height:20px;font-size:13px;color:var(--ink-soft);display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+#mjHand{display:flex;flex-direction:column;gap:9px;padding-top:10px}
+.hrow{display:flex;gap:3px;justify-content:center}
+#mjHand .tile{--tw:inherit;width:var(--tw);height:calc(var(--tw)*1.36);transition:transform .12s}
+#mjHand .tile.tap{cursor:pointer}
+#mjHand .tile.sel{transform:translateY(-10px);box-shadow:0 0 0 2.5px var(--pink),0 calc(var(--tw)*.09) 0 var(--felt-deep)}
+#mjHand .tile.drawn{margin-left:10px}
+#mjClaim{background:var(--paper);border-radius:18px;padding:8px;box-shadow:0 3px 0 var(--line),0 0 0 3px var(--sun);display:flex;flex-direction:column;gap:8px;animation:pop .2s ease-out}
+.cbt{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px}
+.cbb{display:flex;gap:8px;flex-wrap:wrap}
+.cbb .candy{flex:1 1 0;padding:10px 6px;font-size:18px;min-width:56px}
+.cbb .chow{display:flex;gap:2px;justify-content:center;flex:1 1 30%}
+#mjActs{display:flex;gap:8px;flex-wrap:wrap;min-height:46px;align-items:center}
+#mjActs .candy{flex:1 1 0;padding:11px 6px;font-size:16px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.mjwait{margin:auto;color:var(--ink-soft);font-size:14px}
+.mjres{max-height:100%;overflow-y:auto;gap:10px}
+.reshand{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+.tai{display:flex;flex-direction:column;gap:2px;background:var(--lav);border-radius:14px;padding:8px 12px;font-size:14px}
+.tai div{display:flex;justify-content:space-between}
+.tai b{font-family:var(--f-num)}
+.tai .tot{border-top:1.5px dashed var(--line);margin-top:4px;padding-top:4px;font-size:16px}
+.pays{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pays div{display:flex;align-items:baseline;gap:6px;background:var(--lav);border-radius:12px;padding:6px 10px;font-size:14px;min-width:0}
+.pays div.me{background:#FFE6EE}
+.pays span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pays b{font-family:var(--f-num)}
+.pays b.up{color:#1C8B50}.pays b.down{color:var(--red)}
+.pays i{font-style:normal;font-size:11px;color:var(--ink-soft);font-family:var(--f-num)}
+@media (min-width:600px){ .mjm .tile{--tw:19px} #mjPool .tile{--tw:26px} }
+/* 麻將：內容太高時整頁可以捲，牌河最少保留 96px，吃碰框浮在牌河上方不擠掉手牌 */
+.g-mj #game{overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.g-mj #mj{flex:1 0 auto}
+#mjRiver{flex:1 1 0;min-height:96px}
+#mjBottom{position:relative;display:flex;flex-direction:column;gap:6px}
+#mjClaim{position:absolute;left:0;right:0;bottom:calc(100% + 8px);z-index:6}
+.mjm .tile{--tw:13px}
+.mjopp{padding:5px}
+@media (max-height:720px){ #mjOpps .sc{display:none} .mjoh .av{width:30px;height:30px} .mjoh .av svg{width:26px;height:26px} #mjPool .tile{--tw:19px} #mjLast{min-height:40px} .tile.big{--tw:28px} }
+
+/* ---------- 金幣・段位・排行 ---------- */
+.coin{display:inline-block;width:1em;height:1em;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFF1B8 0 18%,var(--sun) 19% 62%,var(--sun-deep) 63%);box-shadow:inset 0 0 0 1.5px var(--sun-deep);vertical-align:-.15em;margin-right:.25em;font-style:normal;flex:none}
+.tier{display:inline-flex;align-items:center;font-size:12px;line-height:1;padding:3px 8px;border-radius:99px;background:var(--tc);color:#fff;letter-spacing:.05em;white-space:nowrap}
+.profile{display:flex;align-items:center;gap:12px;background:var(--paper);border-radius:22px;padding:12px 14px;box-shadow:0 3px 0 var(--line)}
+.pfav{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:var(--lav);box-shadow:0 0 0 3px var(--tc,#ccc);flex:none}
+.pfav svg{width:50px;height:50px}
+.pfmid{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.pfrow{display:flex;align-items:center;gap:8px;min-width:0}
+.pfrow b{font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pfrow.small{justify-content:space-between;font-size:12px;color:var(--ink-soft);white-space:nowrap;gap:6px}
+.pfrow.small span{overflow:hidden;text-overflow:ellipsis}
+.pfrow.small b{font-size:12px;color:var(--ink);font-family:var(--f-num)}
+.rp{font-family:var(--f-num);font-weight:700;font-size:14px}
+.pbar{height:8px;border-radius:99px;background:var(--lav);overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--sun),var(--pink));transition:width .6s ease}
+.pfcoins{display:inline-flex;align-items:center;font-family:var(--f-num);font-weight:700;font-size:17px;background:#FFF6D6;border-radius:99px;padding:6px 12px;align-self:flex-start;white-space:nowrap}
+.streak{font-size:12px;background:var(--red);color:#fff;border-radius:99px;padding:2px 8px;animation:pulse 1.2s ease-in-out infinite}
+.streak b{font-family:var(--f-num)}
+.quick3{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.quick3 .candy{font-size:14px}
+.quick3 .candy{font-size:15px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.qi{width:24px;height:24px;border-radius:8px;display:block;background:var(--lav);position:relative}
+.qi-rank{background:linear-gradient(to top,var(--sun) 0 40%,transparent 40%) 2px 100%/6px 100% no-repeat,linear-gradient(to top,var(--pink) 0 75%,transparent 75%) 9px 100%/6px 100% no-repeat,linear-gradient(to top,var(--felt-deep) 0 55%,transparent 55%) 16px 100%/6px 100% no-repeat}
+.qi-daily{background:var(--paper);box-shadow:inset 0 0 0 2px var(--ink);border-radius:6px}
+.qi-daily:before{content:"";position:absolute;left:0;right:0;top:0;height:7px;background:var(--red);border-radius:6px 6px 0 0}
+.qi-daily:after{content:"✓";position:absolute;inset:7px 0 0;display:grid;place-items:center;font-size:13px;font-weight:700}
+.qi-shop{background:var(--sun);border-radius:5px 5px 8px 8px}
+.qi-shop:before{content:"";position:absolute;left:6px;right:6px;top:-6px;height:9px;border:2.5px solid var(--ink);border-bottom:0;border-radius:8px 8px 0 0}
+.dot{position:absolute;top:8px;right:calc(50% - 22px);width:10px;height:10px;border-radius:50%;background:var(--red);box-shadow:0 0 0 2px var(--paper)}
+.ticker{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);background:rgba(255,255,255,.6);border-radius:99px;padding:5px 12px;min-height:22px;overflow:hidden;white-space:nowrap}
+.ticker.in{animation:tick .45s ease-out}
+.tav{width:22px;height:22px;flex:none;display:grid;place-items:center}.tav svg{width:22px;height:22px}
+@keyframes tick{from{transform:translateY(80%);opacity:0}}
+.result.sheet{max-height:100%;overflow-y:auto;width:min(420px,100%)}
+.chips.center{justify-content:center}
+.rlist{display:flex;flex-direction:column;gap:4px}
+.rrow{display:grid;grid-template-columns:30px 30px minmax(0,1fr) auto 46px;align-items:center;gap:8px;padding:5px 8px;border-radius:12px;background:var(--lav);font-size:14px}
+.rrow.me{background:#FFE6EE;box-shadow:0 0 0 2px var(--pink)}
+.rno{font-family:var(--f-num);font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.rrow.top1 .rno{background:var(--sun);border-radius:50%;height:26px;display:grid;place-items:center}
+.rrow.top2 .rno{background:#D9DEE8;border-radius:50%;height:26px;display:grid;place-items:center}
+.rrow.top3 .rno{background:#EBC6A4;border-radius:50%;height:26px;display:grid;place-items:center}
+.rav svg{width:28px;height:28px;display:block}
+.rnm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rnm em{font-style:normal;font-size:11px;background:var(--pink);color:#fff;border-radius:99px;padding:1px 6px}
+.rrp{font-family:var(--f-num);font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.rgap{text-align:center;color:var(--ink-soft);line-height:1}
+#rankHead b{font-family:var(--f-num);color:var(--ink)}
+.cigrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.ci{background:var(--lav);border-radius:14px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;color:var(--ink-soft)}
+.ci b{font-family:var(--f-num);color:var(--ink);font-size:15px}
+.ci .coin{font-size:20px;margin:0}
+.ci.big{grid-column:span 2;background:#FFF6D6}
+.ci.got{opacity:.5}
+.ci.got:after{content:"已領";font-size:11px}
+.ci.today{box-shadow:0 0 0 2.5px var(--pink);background:#FFE6EE;animation:pulse 1.2s ease-in-out infinite}
+.tasks{display:flex;flex-direction:column;gap:6px}
+.task{display:flex;align-items:center;gap:10px;background:var(--lav);border-radius:14px;padding:8px 10px}
+.task .tt{flex:1;min-width:0;display:grid;grid-template-columns:1fr auto;gap:4px 8px;font-size:14px}
+.task .tt span{grid-column:1/-1}
+.tbar{height:6px;background:var(--paper);border-radius:99px;overflow:hidden;align-self:center}
+.tbar i{display:block;height:100%;background:var(--felt-deep)}
+.task small{font-family:var(--f-num);font-size:12px;color:var(--ink-soft)}
+.task .candy{font-size:14px;padding:8px 10px;display:inline-flex;align-items:center;font-family:var(--f-num);font-weight:700;flex:none}
+.task.claimed{opacity:.55}
+.shophead{display:flex;justify-content:space-between;align-items:center}
+.shophead h2{text-align:left}
+.sgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.sitem{background:var(--lav);border-radius:16px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.sitem.on{box-shadow:0 0 0 2.5px var(--pink)}
+.sitem .candy{width:100%;font-size:14px;padding:8px 6px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--f-num);font-weight:700}
+.spv{height:64px;width:100%;display:grid;place-items:center}
+.spv.av svg{width:60px;height:60px}
+.spv.felt{border-radius:999px/60%;background:var(--sf);box-shadow:inset 0 0 0 4px rgba(255,255,255,.45),inset 0 -6px 0 var(--sfd);display:flex;justify-content:center;align-items:center;gap:4px}
+.spv.felt i{width:16px;height:22px;background:#fff;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.spv[data-th=mint]{--sf:#A8E3CF;--sfd:#6CC6A8}.spv[data-th=sakura]{--sf:#FFC9D9;--sfd:#F29AB6}.spv[data-th=milktea]{--sf:#E8D2B4;--sfd:#C9A57C}.spv[data-th=night]{--sf:#4B4F8F;--sfd:#2E3168}
+.spv.emo{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;align-content:center}
+.spv.emo span{font-size:11px;background:var(--paper);border-radius:99px;padding:2px 7px}
+.lseat .nm .tier{font-size:10px;padding:2px 6px;margin-top:2px}
+.rw{background:#FFF6D6;border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.rw.small{padding:8px 12px}
+.rwc{display:flex;align-items:center;gap:6px;font-size:14px}
+.rwc .coin{font-size:24px}
+.rwc b{font-family:var(--f-num);font-size:26px;font-variant-numeric:tabular-nums}
+.rw.small .rwc b{font-size:18px}.rw.small .rwc .coin{font-size:18px}
+.rwl{display:flex;flex-wrap:wrap;gap:4px}
+.rwl span{font-size:12px;background:var(--paper);border-radius:99px;padding:2px 8px}
+.rwr{display:flex;justify-content:space-between;align-items:center;font-size:13px;flex-wrap:wrap;gap:4px;font-family:var(--f-num)}
+.rwr em{font-style:normal;font-weight:700}
+.up{color:#1C8B50}.down{color:var(--red)}
+.rw .pbar i{background:var(--tc)}
+.coinpop{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);font-family:var(--f-num);font-weight:700;font-size:40px;color:var(--ink);display:flex;align-items:center;z-index:40;pointer-events:none;animation:coinup 1.4s ease-out forwards;text-shadow:0 3px 0 #fff}
+.coinpop .coin{font-size:44px}
+@keyframes coinup{0%{opacity:0;transform:translate(-50%,-20%) scale(.6)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}100%{opacity:0;transform:translate(-50%,-140%) scale(1)}}
+/* 牌桌主題 */
+html[data-table=sakura]{--felt:#FFC9D9;--felt-deep:#F29AB6;--bg:#FFEEF3}
+html[data-table=milktea]{--felt:#E8D2B4;--felt-deep:#C9A57C;--bg:#F7EEE2}
+html[data-table=night]{--felt:#4B4F8F;--felt-deep:#2E3168;--bg:#E3E4F5}
+html[data-table=night] .cell{color:#fff}
+html[data-table=night] .cell.on,html[data-table=night] .cell.seven{color:var(--ink)}
+html[data-table=night] .brow .bs{color:#fff}
+html[data-table=night] .brow .bs.red{color:#FF9DB5}
+
+/* ---------- 結算 ---------- */
+.overlay{position:fixed;inset:0;background:rgba(45,42,74,.45);display:grid;place-items:center;z-index:20;padding:max(16px,env(safe-area-inset-left,0px));padding-block:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-bottom,0px))}
+.result{background:var(--paper);border-radius:26px;padding:22px 18px;width:min(360px,100%);box-sizing:border-box;display:flex;flex-direction:column;gap:12px;animation:pop .3s ease-out;box-shadow:0 6px 0 var(--line)}
+.result h2{margin:0;text-align:center;font-size:26px;letter-spacing:.08em}
+.result .sub{text-align:center;color:var(--ink-soft);font-size:14px;margin:-6px 0 4px}
+.rk{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:16px;background:var(--lav)}
+.rk.me{background:#FFE6EE}
+.rk .no{font-family:var(--f-num);font-weight:700;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--paper);flex:none}
+.rk.p1 .no{background:var(--sun)}
+.rk .av{width:38px;height:38px;box-shadow:none}
+.rk .av svg{width:32px;height:32px}
+.rk .nm{flex:1;min-width:0;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rbtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+.rbtns>button{flex:1 1 40%}
+#btnRoom{flex-basis:100%}
+
+#toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:14px;font-size:15px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;max-width:80%;text-align:center}
+#toast.show{opacity:1}
+#fx{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;z-index:25}
+#fx .boom{font-size:56px;color:#fff;letter-spacing:.08em;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;text-shadow:0 6px 0 var(--pink-deep);animation:boom 1.1s ease-out forwards}
+.shake{animation:shake .45s}
+
+@keyframes bob{50%{transform:translateY(-3px)}}
+@keyframes pulse{50%{transform:scale(1.06)}}
+@keyframes pop{from{transform:scale(.7);opacity:0}}
+.bubble{animation-name:bpop}
+@keyframes bpop{from{opacity:0;transform:translateX(-50%) translateY(-80%) scale(.7)}}
+@keyframes fly{from{transform:translate(var(--fx,0),var(--fy,0)) scale(.6);opacity:.3}}
+@keyframes dealIn{from{transform:translateY(-120px) rotate(-12deg);opacity:0}}
+@keyframes boom{0%{transform:scale(.3);opacity:0}25%{transform:scale(1.15);opacity:1}60%{transform:scale(1)}100%{transform:scale(1.05);opacity:0}}
+@keyframes shake{20%{transform:translate(-6px,2px)}40%{transform:translate(6px,-2px)}60%{transform:translate(-4px,1px)}80%{transform:translate(3px,0)}}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+@media (min-height:760px){.av{width:56px;height:56px}.av svg{width:48px;height:48px}.table{grid-template-columns:90px 1fr 90px}}
+
+/* ===================== 動漫風外觀 ===================== */
+.logo h1{font-weight:900;font-style:italic;font-size:34px;color:var(--pink);-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;text-shadow:3px 3px 0 var(--ink);letter-spacing:.04em;transform:skewX(-6deg)}
+.logo p{font-weight:700;color:var(--ink);background:var(--sun);display:inline-block;padding:1px 8px;border:2px solid var(--ink);border-radius:6px;transform:skewX(-8deg);margin-top:4px}
+.panel,.profile{border:2.5px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:18px}
+.result{border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:20px}
+.result h2{font-weight:900;font-style:italic;letter-spacing:.06em;background:linear-gradient(transparent 58%,var(--sun) 58%,var(--sun) 92%,transparent 92%);justify-self:center;align-self:center;padding:0 6px}
+.field>label,.field>.lbl,.lbl{font-weight:900;color:var(--ink);letter-spacing:.12em}
+.candy{border:2.5px solid var(--ink);box-shadow:0 4px 0 var(--ink);font-weight:900;letter-spacing:.06em}
+.candy:active{box-shadow:0 1px 0 var(--ink)}
+.candy.sun{box-shadow:0 4px 0 var(--ink)}.candy.sun:active{box-shadow:0 1px 0 var(--ink)}
+.candy.plain{box-shadow:0 4px 0 var(--ink)}.candy.plain:active{box-shadow:0 1px 0 var(--ink)}
+.candy:disabled{box-shadow:0 4px 0 rgba(27,27,58,.3);border-color:rgba(27,27,58,.4)}
+.candy:not(.plain):not(.sun){text-shadow:1.5px 1.5px 0 var(--pink-deep)}
+.chip{border:2px solid var(--ink);font-weight:700}
+.chip[aria-pressed="true"]{background:var(--ink);color:#fff;box-shadow:2px 2px 0 var(--pink)}
+.gcard{border:2.5px solid var(--ink);background:var(--paper)}
+.gcard b{font-weight:900;font-style:italic}
+.gcard[aria-pressed="true"]{border-color:var(--ink);background:#FFE1EC;box-shadow:3px 3px 0 var(--ink);transform:translate(-1px,-1px)}
+#nick,#joinCode{border:2.5px solid var(--ink);background:var(--paper);font-weight:700}
+.av{border:2.5px solid var(--ink);background:linear-gradient(160deg,#FFFFFF,#DDE6FF);box-shadow:2px 2px 0 var(--ink)}
+.seat.turn .av,#me.turn .av{box-shadow:0 0 0 3px var(--sun),0 0 0 6px var(--ink)}
+.pfav{border:2.5px solid var(--ink);background:linear-gradient(160deg,#FFFFFF,#DDE6FF)}
+.pname{font-weight:700}
+#center{border:3px solid var(--ink);box-shadow:inset 0 0 0 5px rgba(255,255,255,.4),inset 0 -8px 0 var(--felt-deep),4px 4px 0 var(--ink);
+  background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.12) 0 4deg,transparent 4deg 12deg),var(--felt)}
+#tableLabel{border:2px solid var(--ink);font-weight:700;background:#fff}
+.card{border:2px solid var(--ink);box-shadow:2px 3px 0 var(--ink)}
+.card .cr{font-weight:700}
+.card.sel{border-color:var(--ink);box-shadow:0 0 0 3px var(--pink),3px 5px 0 var(--ink)}
+.card.can{border-color:var(--ink);box-shadow:0 0 0 3px var(--sun),3px 5px 0 var(--ink)}
+.mini{border:1.5px solid var(--ink)}
+.bubble{border:2px solid var(--ink);font-weight:900;box-shadow:2px 2px 0 var(--ink)}
+.bubble:after{bottom:-6px}
+#meTag{border:2px solid var(--ink);font-weight:700}
+.qc{border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);font-weight:700}
+.qc.bomb{box-shadow:2px 2px 0 var(--ink)}
+.qc.on{outline:none;background:var(--sun);color:var(--ink)}
+.tier{border:1.5px solid var(--ink);font-weight:900;font-style:italic;text-shadow:1px 1px 0 rgba(0,0,0,.35)}
+.pfcoins{border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink)}
+.pbar{border:2px solid var(--ink);height:10px;box-sizing:border-box}
+.ticker{border:2px solid var(--ink);background:#fff;color:var(--ink);font-weight:700}
+.streak{border:1.5px solid var(--ink);font-weight:900;font-style:italic}
+.lseat,.rk,.rrow,.task,.ci,.sitem,.pays div,.tai,.mjopp{border:2px solid var(--ink)}
+.rk.me,.rrow.me,.pays div.me{box-shadow:3px 3px 0 var(--ink);background:#FFE1EC}
+.rk .no{border:2px solid var(--ink);font-weight:700}
+.rw{border:2.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.cell{border:1.5px solid rgba(27,27,58,.25)}
+.cell.on{border-color:var(--ink);box-shadow:1.5px 1.5px 0 var(--ink)}
+.cell.new{box-shadow:0 0 0 2.5px var(--pink)}
+.tile{border:1.6px solid var(--ink);font-weight:700}
+.tile b{font-weight:900}
+#mjRiver{border:3px solid var(--ink);box-shadow:inset 0 0 0 4px rgba(255,255,255,.4),inset 0 -6px 0 var(--felt-deep),4px 4px 0 var(--ink)}
+#mjLast{border:2px solid var(--ink);font-weight:700}
+#mjClaim{border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink),0 0 0 3px var(--sun) inset}
+#mjMeInfo .go,.wind{border:1.5px solid var(--ink);font-weight:700}
+#emoBar button{border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);font-weight:700}
+.codebox #roomCode{font-style:italic;-webkit-text-stroke:1px var(--ink);color:var(--pink);text-shadow:3px 3px 0 var(--ink)}
+#toast{border:2.5px solid #fff;box-shadow:0 0 0 2.5px var(--ink),4px 4px 0 2.5px var(--ink);font-weight:700}
+.overlay{background:rgba(27,27,58,.55);background-image:radial-gradient(circle,rgba(255,255,255,.08) 1.5px,transparent 2px);background-size:10px 10px}
+/* 漫畫爆炸字 + 集中線 */
+#fx:before{content:"";position:absolute;inset:-20%;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(27,27,58,.55) 0 1.2deg,transparent 1.2deg 6deg);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 0 26%,#000 62%);mask:radial-gradient(circle at 50% 50%,transparent 0 26%,#000 62%);opacity:0}
+#fx.on:before{animation:speed 1.1s ease-out}
+#fx .boom{position:relative;isolation:isolate;padding:34px 46px;font-weight:900;font-style:italic;font-size:52px;color:#fff;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;text-shadow:4px 5px 0 var(--ink);letter-spacing:.06em;white-space:nowrap;transform:rotate(-6deg)}
+#fx .boom:before,#fx .boom:after{content:"";position:absolute;z-index:-1;clip-path:polygon(50% 0%,57% 22%,75% 5%,72% 28%,98% 18%,82% 40%,100% 52%,80% 60%,94% 84%,70% 74%,62% 100%,50% 80%,37% 98%,31% 75%,6% 88%,19% 62%,0% 50%,19% 40%,4% 16%,29% 27%,26% 3%,43% 22%)}
+#fx .boom:before{inset:-8px;background:var(--ink)}
+#fx .boom:after{inset:0;background:var(--sun)}
+#fx .boom.pink:after{background:var(--pink)}
+@keyframes speed{0%{opacity:0;transform:scale(1.3)}15%{opacity:1}100%{opacity:0;transform:scale(1)}}
+@keyframes boom{0%{transform:rotate(-6deg) scale(.2);opacity:0}22%{transform:rotate(-6deg) scale(1.2);opacity:1}40%{transform:rotate(-6deg) scale(.95)}75%{transform:rotate(-6deg) scale(1);opacity:1}100%{transform:rotate(-6deg) scale(1.08);opacity:0}}
+.coinpop{-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;color:var(--sun);text-shadow:3px 3px 0 var(--ink);font-style:italic}
+
+/* ---------- 我的戰績 ---------- */
+.qi-stats{background:var(--paper);box-shadow:inset 0 0 0 2px var(--ink);border-radius:50%}
+.qi-stats:before{content:"★";position:absolute;inset:0;display:grid;place-items:center;color:var(--pink);font-size:15px;font-weight:900}
+#pfAv{cursor:pointer}
+.stsheet{gap:8px}
+.stbody{display:flex;flex-direction:column;gap:8px}
+.sthero{display:flex;align-items:center;gap:12px}
+.sthn{display:flex;flex-direction:column;gap:3px;min-width:0}
+.sthn b{font-size:20px;font-weight:900;font-style:italic}
+.sthn span{display:flex;align-items:center;gap:6px;font-family:var(--f-num);font-weight:700;font-size:13px;flex-wrap:wrap}
+.sthn small{font-size:12px;color:var(--ink-soft)}
+.stbig{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.stbig div,.sthl div,.stg{background:var(--lav);border:2px solid var(--ink);border-radius:14px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;min-width:0}
+.stbig b,.sthl b{font-family:var(--f-num);font-weight:700;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.stbig b small,.sthl b small{font-size:13px;margin-left:1px}
+.stbig span,.sthl span{font-size:11px;color:var(--ink-soft);font-weight:700}
+.stbig .hl{background:var(--sun);box-shadow:3px 3px 0 var(--ink)}
+.stbig .hl b{font-size:26px}
+.stcard{background:#fff;border:2px solid var(--ink);border-radius:14px;padding:6px}
+.spark{display:block;width:100%;height:auto}
+.stgames{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stg{align-items:stretch;padding:8px}
+.stg b{font-weight:900;font-size:14px}
+.stg .wr{font-family:var(--f-num);font-weight:700;font-size:22px;line-height:1.1}
+.stg small{font-size:11px;color:var(--ink-soft)}
+.plbar{display:flex;height:9px;border-radius:99px;overflow:hidden;border:1.5px solid var(--ink);margin-top:3px;background:#fff}
+.plbar i,.pllegend i{display:block}
+.p0{background:var(--sun)}.p1{background:var(--cyan)}.p2{background:#B9A8FF}.p3{background:#C9CBDD}.p9{background:#fff}
+.pllegend{display:flex;justify-content:center;gap:12px;font-size:11px;color:var(--ink-soft)}
+.pllegend span{display:flex;align-items:center;gap:4px}
+.pllegend i{width:10px;height:10px;border-radius:3px;border:1.5px solid var(--ink)}
+.sthl{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.sthl em{font-style:normal;font-size:10px;color:var(--pink-deep);font-weight:700;line-height:1.2}
+.rivals{display:flex;flex-direction:column;gap:5px}
+.rv{display:grid;grid-template-columns:30px minmax(0,1fr) 70px 58px;align-items:center;gap:8px;background:var(--lav);border:2px solid var(--ink);border-radius:12px;padding:5px 8px;font-size:14px}
+.rv .rnm{display:flex;flex-direction:column;line-height:1.2}
+.rv .rnm small{font-size:11px;color:var(--ink-soft)}
+.vs{height:9px;border-radius:99px;background:var(--red);border:1.5px solid var(--ink);overflow:hidden}
+.vs i{display:block;height:100%;background:#2BB673}
+.rv b{font-family:var(--f-num);font-size:13px;text-align:right}
+.achs{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.ach{display:grid;grid-template-columns:38px 1fr;grid-template-rows:auto auto auto;column-gap:8px;align-items:center;background:#F4F4F8;border:2px dashed #A7A9C4;border-radius:14px;padding:7px;min-width:0;color:var(--ink-soft)}
+.ach .badge{grid-row:1/4;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-family:var(--f-num);font-weight:700;font-size:11px;background:#E1E2EE;border:2px solid #A7A9C4}
+.ach b{font-size:13px;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ach small{font-size:10.5px;line-height:1.25}
+.ach em{font-style:normal;font-family:var(--f-num);font-weight:700;font-size:11px;display:flex;align-items:center}
+.ach .tbar{grid-column:2;height:5px;margin:2px 0}
+.ach.got{background:#FFF6D6;border:2px solid var(--ink);color:var(--ink);box-shadow:2px 2px 0 var(--ink)}
+.ach.got .badge{color:#fff;font-size:18px;border:2px solid var(--ink);text-shadow:1px 1px 0 var(--ink)}
+.ach.got .c-play{background:var(--cyan)}.ach.got .c-win{background:var(--pink)}.ach.got .c-big2{background:#FF8A1F}
+.ach.got .c-seven{background:#2BB673}.ach.got .c-mj{background:#B05BE6}.ach.got .c-rank{background:var(--sun)}
+.recent{display:flex;flex-direction:column;gap:4px}
+.rc{display:grid;grid-template-columns:52px 46px 1fr auto 40px;align-items:center;gap:6px;font-size:13px;background:var(--lav);border-radius:10px;padding:5px 8px}
+.rc .rg{font-weight:900}
+.rc .rp{font-weight:700;border-radius:6px;text-align:center;border:1.5px solid var(--ink);font-size:12px}
+.rc .rt{color:var(--ink-soft);font-size:12px}
+.rc .rcn{display:flex;align-items:center;font-family:var(--f-num);font-weight:700}
+.rc > span:last-child{font-family:var(--f-num);font-weight:700;text-align:right}
+#bragText{white-space:pre-wrap;user-select:text;-webkit-user-select:text;background:var(--lav);padding:8px;border-radius:10px;margin:0;font-family:var(--f-cute)}
+.achline{background:var(--sun)!important;border:1.5px solid var(--ink);font-weight:900}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <section id="menu" class="screen">
+    <div class="logo">
+      <svg viewBox="0 0 80 80" aria-hidden="true">
+        <path d="M40 2 L46 18 L62 8 L58 26 L78 26 L64 40 L78 54 L58 54 L62 72 L46 62 L40 78 L34 62 L18 72 L22 54 L2 54 L16 40 L2 26 L22 26 L18 8 L34 18Z" fill="#FFD23F" stroke="#1B1B3A" stroke-width="2.5" stroke-linejoin="round"/>
+        <rect x="16" y="20" width="26" height="38" rx="5" fill="#fff" stroke="#1B1B3A" stroke-width="2.5" transform="rotate(-14 29 39)"/>
+        <rect x="36" y="18" width="26" height="38" rx="5" fill="#FF4F8B" stroke="#1B1B3A" stroke-width="2.5" transform="rotate(12 49 37)"/>
+        <path d="M49 30 L51.5 35 L57 35.5 L53 39 L54 44.5 L49 42 L44 44.5 L45 39 L41 35.5 L46.5 35Z" fill="#fff" stroke="#1B1B3A" stroke-width="1.6" transform="rotate(12 49 37)"/>
+        <text x="21" y="44" font-size="15" font-family="Fredoka" font-weight="700" fill="#1B1B3A" transform="rotate(-14 29 39)">2</text>
+      </svg>
+      <div><h1>揪咖打牌</h1><p>跟朋友的牌桌，隨時開一局</p></div>
+    </div>
+
+    <div class="profile">
+      <div class="pfav" id="pfAv"></div>
+      <div class="pfmid">
+        <div class="pfrow"><b id="pfName"></b><span class="streak" id="pfStreak" hidden></span></div>
+        <div class="pfrow" id="pfTier"></div>
+        <div class="pbar"><i id="pfBar"></i></div>
+        <div class="pfrow small"><span id="pfNext"></span><span id="pfRank"></span></div>
+      </div>
+      <div class="pfcoins" id="pfCoins"></div>
+    </div>
+    <div class="quick3">
+      <button class="candy plain" id="btnRank"><span class="qi qi-rank"></span>排行榜</button>
+      <button class="candy plain" id="btnStats"><span class="qi qi-stats"></span>戰績</button>
+      <button class="candy plain" id="btnDaily"><span class="qi qi-daily"></span>每日<i class="dot" id="dotDaily" hidden></i></button>
+      <button class="candy plain" id="btnShop"><span class="qi qi-shop"></span>商店</button>
+    </div>
+    <div class="ticker" id="ticker" aria-live="off"></div>
+
+    <div class="panel">
+      <div class="field">
+        <label for="nick">你的暱稱</label>
+        <input id="nick" maxlength="8" placeholder="輸入暱稱" autocomplete="off">
+        <div class="stat" id="statLine"></div>
+      </div>
+      <div class="field">
+        <span class="lbl">玩什麼</span>
+        <div class="games">
+          <button class="gcard" id="gBig2" aria-pressed="true"><b>大老二</b><span>2 最大，鐵支、同花順是炸彈</span></button>
+          <button class="gcard" id="gSeven" aria-pressed="false"><b>排七</b><span>從 7 往兩邊接，蓋牌少的贏</span></button>
+          <button class="gcard" id="gMJ" aria-pressed="false"><b>麻將</b><span>台灣十六張，固定 4 人</span></button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lbl">幾個人</span>
+        <div class="chips" id="nChips">
+          <button class="chip" data-n="2" aria-pressed="false">2 人</button>
+          <button class="chip" data-n="3" aria-pressed="false">3 人</button>
+          <button class="chip" data-n="4" aria-pressed="true">4 人</button>
+        </div>
+      </div>
+      <div class="field" id="mlField" hidden>
+        <span class="lbl">打多久</span>
+        <div class="chips" id="mlChips"><button class="chip" data-l="one">單局</button><button class="chip" data-l="round">東風圈</button><button class="chip" data-l="full">一將</button></div>
+      </div>
+      <div class="field">
+        <span class="lbl">電腦難度</span>
+        <div class="chips" id="dChips">
+          <button class="chip" data-d="easy" aria-pressed="false">簡單</button>
+          <button class="chip" data-d="normal" aria-pressed="true">普通</button>
+        </div>
+      </div>
+      <button class="candy" id="btnStart">單機練習（跟電腦打）</button>
+    </div>
+    <div class="panel" id="netPanel">
+      <div class="field">
+        <span class="lbl">跟朋友連線</span>
+        <button class="candy sun" id="btnHost">開房間</button>
+      </div>
+      <div class="field">
+        <label for="joinCode">或輸入朋友的房號</label>
+        <div class="joinrow"><input id="joinCode" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off"><button class="candy" id="btnJoin">加入</button></div>
+      </div>
+      <p class="note" id="netNote">開房的人當房主，遊戲在房主手機上跑。開房時再選玩什麼、幾個人。</p>
+    </div>
+    <div class="menu-foot">
+      <button class="candy plain" id="btnRules" style="font-size:14px;padding:8px 14px">規則</button>
+      <button class="candy plain" id="btnSound1" style="font-size:14px;padding:8px 14px">音效：開</button>
+    </div>
+  </section>
+
+  <section id="lobby" class="screen" hidden>
+    <div class="bar">
+      <button class="candy plain" id="btnLeave">離開</button>
+      <div class="ttl">房間</div>
+      <span style="width:48px"></span>
+    </div>
+    <div class="panel">
+      <div class="codebox"><span>房號</span><b id="roomCode">····</b></div>
+      <button class="candy sun" id="btnCopy">複製邀請（貼到 LINE）</button>
+      <div class="stat" id="linkText"></div>
+      <div id="lobbySeats"></div>
+    </div>
+    <div class="panel" id="lobbyCtl" hidden>
+      <div class="field"><span class="lbl">玩什麼</span>
+        <div class="chips" id="lgChips"><button class="chip" data-g="big2">大老二</button><button class="chip" data-g="seven">排七</button><button class="chip" data-g="mj">麻將</button></div></div>
+      <div class="field" id="llField" hidden><span class="lbl">麻將打多久</span>
+        <div class="chips" id="llChips"><button class="chip" data-l="one">單局</button><button class="chip" data-l="round">東風圈</button><button class="chip" data-l="full">一將</button></div></div>
+      <div class="field"><span class="lbl">幾個人（不夠的由電腦補）</span>
+        <div class="chips" id="lnChips"><button class="chip" data-n="2">2 人</button><button class="chip" data-n="3">3 人</button><button class="chip" data-n="4">4 人</button></div></div>
+      <div class="field"><span class="lbl">電腦難度</span>
+        <div class="chips" id="ldChips"><button class="chip" data-d="easy">簡單</button><button class="chip" data-d="normal">普通</button></div></div>
+      <button class="candy" id="btnGo">開始遊戲</button>
+      <p class="note" id="lobbyNote"></p>
+    </div>
+  </section>
+
+  <section id="game" class="screen" hidden>
+    <div class="bar">
+      <button class="candy plain" id="btnBack">回大廳</button>
+      <div class="ttl" id="ttl">大老二</div>
+      <button class="candy plain" id="btnSound2">音效：開</button>
+    </div>
+    <div class="table" id="table">
+      <div id="center"><div id="tableLabel"></div><div id="board"></div><div id="tableCards"></div><div class="tblkind" id="tableKind"></div></div>
+    </div>
+    <div id="mj">
+      <div id="mjInfo"></div>
+      <div id="mjOpps"></div>
+      <div id="mjRiver"><div id="mjLast"></div><div id="mjPool"></div></div>
+      <div id="mjMeRow"><div id="mjMeInfo"></div><div id="mjMelds"></div></div>
+      <div id="mjTing"></div>
+      <div id="mjBottom">
+        <div id="mjClaim" hidden></div>
+        <div id="mjHand"></div>
+        <div id="mjActs"></div>
+      </div>
+    </div>
+    <div id="me">
+      <div class="meinfo">
+        <div class="av" id="meAv"></div>
+        <span id="meName"></span><span id="meTag"></span>
+        <span id="selInfo"></span>
+      </div>
+      <div id="quick" aria-label="快速選牌"></div>
+      <div id="hand"></div>
+    </div>
+    <div id="emoBar" hidden><button>快點啦</button><button>好牌！</button><button>你完了</button><button>等等我</button><button>哈哈哈</button><button>手氣好爛</button></div>
+    <div class="actions">
+      <button class="candy plain" id="btnSort">排花色</button>
+      <button class="candy sun" id="btnHint">提示</button>
+      <button class="candy plain" id="btnPass">過</button>
+      <button class="candy" id="btnPlay">出牌</button>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="result">
+    <h2 id="resTitle">結算</h2>
+    <p class="sub" id="resSub"></p>
+    <div id="resList" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div id="resReward"></div>
+    <p class="note" id="resWait" style="text-align:center" hidden>等房主開下一局…</p>
+    <div class="rbtns">
+      <button class="candy plain" id="btnHome">回大廳</button>
+      <button class="candy" id="btnAgain">再來一局</button>
+      <button class="candy sun" id="btnRoom" hidden>回房間（換遊戲或人數）</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="rules" hidden>
+  <div class="result" style="gap:8px">
+    <h2 id="rulesTitle">大老二規則</h2>
+    <p class="note" id="rules7" style="color:var(--ink)" hidden>
+      ・52 張全部發完，隨機抽一個人先出。<br>
+      ・每種花色要先有人出 7，之後才能往上接 8、9…K，或往下接 6、5…A。<br>
+      ・輪到你時，能接的牌會發亮，點一下就出。有牌能接就一定要出。<br>
+      ・完全沒牌可以接，就選一張牌蓋起來。<br>
+      ・全部出完後，算各人蓋掉的牌：A 算 1、J 算 11、Q 算 12、K 算 13，總點數越少名次越前面。
+    </p>
+    <p class="note" id="rulesMJ" style="color:var(--ink)" hidden>
+      ・台灣十六張麻將，144 張含 8 張花牌，固定 4 人，空位由電腦補。<br>
+      ・摸到花牌自動補花。可以吃（只能吃上家）、碰、明槓、暗槓、加槓，別人加槓時可以搶槓胡。<br>
+      ・五組面子加一對眼胡牌；門清的七對加一刻是嚦咕嚦咕。牌牆剩 16 張沒人胡就流局，莊家連莊。<br>
+      ・計分：底 2＋台數。自摸三家都付，放槍由放槍的人付。跟莊家有關的再加莊家 1 台、連 N 拉 N。<br>
+      ・常見台數：自摸、門清、門清一摸三、正花、花槓、三元牌、圈風、門風、平胡、碰碰胡、混一色、清一色、字一色、小三元、大三元、小四喜、大四喜、三／四／五暗刻、全求人、獨聽、槓上開花、海底撈月、河底撈魚、搶槓、嚦咕嚦咕。<br>
+      ・輪到你時點一張牌選起來，下面會顯示打這張聽哪些牌，再點一次就打出。
+    </p>
+    <p class="note" style="color:var(--ink-soft);border-top:1.5px dashed var(--line);padding-top:8px">金幣、積分、段位、戰績和成就存在這支手機裡。世界排行上的其他玩家是電腦模擬的對手；「朋友」分頁是一起連線玩過的真人。</p>
+    <p class="note" id="rules2" style="color:var(--ink)">
+      ・2 人每人 26 張、3 人每人 17 張（多的 1 張給拿梅花 3 的人）、4 人每人 13 張。<br>
+      ・拿到梅花 3 的人先出，第一手要包含梅花 3。<br>
+      ・大小：2 &gt; A &gt; K … &gt; 3；花色 ♠ &gt; ♥ &gt; ♦ &gt; ♣。<br>
+      ・牌型：單張、對子，以及五張的順子、同花、葫蘆。三條不能單獨出。<br>
+      ・五張的牌只能壓同一種牌型：順子壓順子、同花壓同花、葫蘆壓葫蘆，不能互壓。<br>
+      ・順子不能繞：A2345 最小，23456 最大。一樣的順子比第一張的花色（34567 比 3）。<br>
+      ・鐵支（四條帶一張）、同花順是炸彈，可以壓任何牌；同花順比鐵支大。<br>
+      ・大家都過，最後出牌的人重新自由出牌。出完牌的順序就是名次。
+    </p>
+    <button class="candy" id="btnRulesOk">知道了</button>
+  </div>
+</div>
+
+<div class="overlay" id="mjRes" hidden><div class="result mjres" id="mjResBox"></div></div>
+
+<div class="overlay" id="leaveAsk" hidden>
+  <div class="result">
+    <h2>離開這局？</h2>
+    <p class="sub">房主離開的話，整個房間會關掉。朋友離開時，他的座位會由電腦代打。</p>
+    <div class="rbtns"><button class="candy plain" id="btnLeaveNo">繼續玩</button><button class="candy" id="btnLeaveYes">離開</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="ovRank" hidden>
+  <div class="result sheet">
+    <h2>世界排行</h2>
+    <div class="chips center" id="rankTabs"><button class="chip" data-t="world">全服</button><button class="chip" data-t="friends">朋友</button></div>
+    <p class="sub" id="rankHead"></p>
+    <div class="rlist" id="rankList"></div>
+    <button class="candy" data-close>關閉</button>
+  </div>
+</div>
+
+<div class="overlay" id="ovStats" hidden>
+  <div class="result sheet stsheet">
+    <h2>我的戰績</h2>
+    <div class="stbody" id="statsBody"></div>
+    <pre class="stat" id="bragText" hidden></pre>
+    <div class="rbtns"><button class="candy sun" id="btnBrag">複製去炫耀</button><button class="candy" data-close>關閉</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="ovDaily" hidden>
+  <div class="result sheet">
+    <h2>每日</h2>
+    <span class="lbl">連續簽到</span>
+    <div class="cigrid" id="ciGrid"></div>
+    <button class="candy sun" id="btnCheckin">簽到</button>
+    <span class="lbl">今日任務（每天換）</span>
+    <div class="tasks" id="taskList"></div>
+    <button class="candy plain" data-close>關閉</button>
+  </div>
+</div>
+
+<div class="overlay" id="ovShop" hidden>
+  <div class="result sheet">
+    <div class="shophead"><h2>商店</h2><span class="pfcoins" id="shopCoins"></span></div>
+    <div class="chips center" id="shopTabs"><button class="chip" data-t="avatar">頭像</button><button class="chip" data-t="table">牌桌</button><button class="chip" data-t="emo">嘴砲</button></div>
+    <div class="sgrid" id="shopGrid"></div>
+    <p class="note">金幣怎麼來：贏牌、連勝（最多 ×3）、跟朋友連線（×1.5）、麻將胡牌、每日簽到和任務。</p>
+    <button class="candy" data-close>關閉</button>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="fx"></div>
+
+<script src="peerjs.min.js"></script>
+<script src="engine.js"></script>
+<script src="seven.js"></script>
+<script src="mahjong.js"></script>
+<script src="progress.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
