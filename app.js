@@ -426,6 +426,7 @@ function showGame(){
   t.className='table n'+V.n+(V.type==='seven'?' seven':'');
   $('mjRes').hidden=true; $('mjRes').dataset.k='';
   if(V.type==='bk') bkBuild();
+  $('q7').hidden=true;
   if(V.type==='rm') C.rm=null;
   document.body.className='g-'+V.type;
   $('ttl').textContent = GNAME[V.type] + (C.mode==='guest' || (H&&H.online) ? ` · 房號 ${C.code||H.code}` : '');
@@ -539,7 +540,7 @@ function render7(){
   $('me').classList.toggle('turn', myTurn && V.hand.length>0);
   const tag=$('meTag');
   if(!V.hand.length && !V.over){ tag.textContent='你出完了'; tag.className=''; }
-  else if(myTurn){ tag.innerHTML = (X.playable(S,V.me).length ? '輪到你，點發亮的牌' : '沒牌可接，選一張蓋') + (V.timed?' <span class="tleft"></span>':''); tag.className='go'; }
+  else if(myTurn){ tag.innerHTML = (X.playable(S,V.me).length ? '輪到你，點上面「可以出」的牌' : '沒牌可接，選一張蓋') + (V.timed?' <span class="tleft"></span>':''); tag.className='go'; }
   else { tag.textContent=''; tag.className=''; }
 }
 
@@ -583,8 +584,16 @@ function renderHand(first){
 function updateButtons(){
   const V=C.V, sort=curSort();
   if(V.type==='seven'){
-    const my=V.turn===V.me && !V.over, noPlay = my && !X.playable(fakeS(),V.me).length;
-    $('btnPlay').disabled = !noPlay || C.sel.length!==1;
+    const my=V.turn===V.me && !V.over, ps = my ? X.playable(fakeS(),V.me) : [], noPlay = my && !ps.length;
+    const selPlay = my && C.sel.length===1 && ps.includes(C.sel[0]);
+    $('btnPlay').textContent = selPlay ? '出這張' : '蓋牌';
+    $('btnPlay').disabled = !(selPlay || (noPlay && C.sel.length===1));
+    // 能出的牌另外排成一排大按鈕，不會因為手牌重疊而按錯
+    const q=$('q7');
+    if(my && ps.length){
+      q.hidden=false;
+      q.innerHTML = `<span class="q7l">可以出</span>` + [...ps].sort((a,b)=>B.su(b)-B.su(a)||X.nat(a)-X.nat(b)).map(id=>cardHTML(id,'q7c'+(C.sel[0]===id?' sel':''))).join('');
+    } else { q.hidden=true; q.innerHTML=''; }
     $('btnHint').disabled = !my;
     $('btnSort').textContent = sort==='suit' ? '排大小' : '排花色';
     const pts=V.myCov.reduce((a,id)=>a+X.pts(id),0);
@@ -634,13 +643,21 @@ $('quick').addEventListener('click', e=>{
   renderHand(); updateButtons();
 });
 
+$('q7').addEventListener('click', e=>{
+  const c=e.target.closest('.card'); const V=C&&C.V; if(!c||!V||V.turn!==V.me||V.over) return;
+  const id=+c.dataset.id; if(!X.canPlay(fakeS(),id)) return;
+  C.sel=[]; sendAct({k:'play7', id});
+});
 $('hand').addEventListener('click', e=>{
   const c=e.target.closest('.card'); if(!c||!C||!C.V) return;
   const id=+c.dataset.id, V=C.V;
   if(V.type==='seven'){
     if(V.turn!==V.me||V.over) return;
     const S=fakeS();
-    if(X.canPlay(S,id)){ sendAct({k:'play7', id}); return; }
+    if(X.canPlay(S,id)){
+      if(C.sel[0]===id){ C.sel=[]; sendAct({k:'play7', id}); return; }   // 第二下才出，避免牌太擠按錯
+      C.sel=[id]; Snd.tap(); renderHand(); updateButtons(); return;
+    }
     if(X.playable(S,V.me).length){ toast('先出發亮的牌，有牌能接就要出'); Snd.err(); return; }
     C.sel = C.sel[0]===id ? [] : [id]; Snd.tap(); renderHand(); updateButtons(); return;
   }
@@ -651,7 +668,9 @@ $('hand').addEventListener('click', e=>{
 });
 $('btnPlay').addEventListener('click', ()=>{
   const V=C&&C.V; if(!V || V.turn!==V.me) return;
-  if(V.type==='seven'){ if(C.sel.length===1) sendAct({k:'cover', id:C.sel[0]}); return; }
+  if(V.type==='seven'){ if(C.sel.length!==1) return;
+    const id=C.sel[0]; C.sel=[];
+    sendAct(X.canPlay(fakeS(), id) ? {k:'play7', id} : {k:'cover', id}); return; }
   const err = B.validate(Object.assign(fakeS(), {}), V.me, C.sel);
   if(err){ toast(err); Snd.err(); return; }
   sendAct({k:'play', ids:C.sel.slice()});
@@ -666,7 +685,7 @@ $('btnSort').addEventListener('click', ()=>{
 $('btnHint').addEventListener('click', ()=>{
   const V=C&&C.V; if(!V || V.turn!==V.me) return;
   if(V.type==='seven'){ const c=X.aiChoose(fakeS(), V.me, 'normal');
-    if(c.play!=null){ C.sel=[c.play]; toast('建議出這張，點它就出'); } else { C.sel=[c.cover]; toast('建議蓋這張，按「蓋牌」'); }
+    if(c.play!=null){ C.sel=[c.play]; toast('建議出這張，再點一下或按「出這張」'); } else { C.sel=[c.cover]; toast('建議蓋這張，按「蓋牌」'); }
     Snd.tap(); renderHand(); updateButtons(); return; }
   const cs=B.legal(fakeS(), V.me).sort((a,b)=>B.baseStrength(a)-B.baseStrength(b) || a.size-b.size);
   if(!cs.length){ toast('沒有牌壓得過，按「過」'); Snd.err(); return; }
@@ -1453,7 +1472,7 @@ function renderRM(){
     info = `首次出牌：<b class="${v>=30?'up':'down'}">${v}</b> / 30 點 · ` + info;
   }
   $('rmInfo').innerHTML = info;
-  const tag = V.over ? '這局結束' : myTurn ? (added.length ? `已放 ${added.length} 張，按「完成」` : '點手牌選起來，再按組旁邊的＋或開新組') : `等 ${esc(V.players[V.turn].name)} 出牌…`;
+  const tag = V.over ? '這局結束' : myTurn ? (added.length ? `已放 ${added.length} 張，按「完成」` : '把牌拖到某一組加進去，或拖到桌上空白處開新組') : `等 ${esc(V.players[V.turn].name)} 出牌…`;
   $('rmTag').innerHTML = tag + (myTurn&&V.timed?' <span class="tleft"></span>':'');
   const allOk = sets.every(s=>!s.length || R.valid(s));
   $('rmDone').disabled = !myTurn || !added.length || !allOk;
@@ -1462,23 +1481,34 @@ function renderRM(){
   $('rmHint').disabled = !myTurn;
   $('rmSort').textContent = store.get('jk_rmsort','col')==='col' ? '排數字' : '排顏色';
 }
-function rmMoveSel(target){
-  const sel=C.rm.sel; if(!sel.length) return;
+function rmMoveSel(target, tiles){
+  const sel=tiles||C.rm.sel; if(!sel.length) return;
+  if(target==='rack'){
+    const st=new Set(C.rm.start);
+    if(sel.some(x=>st.has(x))){ toast('桌上原本的牌不能拿回手上'); Snd.err(); return; }
+    C.rm.table=C.rm.table.map(s=>s.filter(x=>!sel.includes(x))).filter(s=>s.length);
+    sel.forEach(x=>{ if(!C.rm.rack.includes(x)) C.rm.rack.push(x); });
+    C.rm.sel=[]; Snd.tap(); renderRM(); return;
+  }
   const V=C.V, st=new Set(C.rm.start);
   if(!V.melded[V.me] && sel.some(x=>st.has(x))){ toast('第一次出牌只能用自己手上的牌'); Snd.err(); return; }
+  if(!V.melded[V.me] && target!=null && C.rm.table[target] && C.rm.table[target].some(x=>st.has(x))){ toast('第一次出牌只能自己開新組，不能接桌上的牌'); Snd.err(); renderRM(); return; }
   C.rm.rack=C.rm.rack.filter(x=>!sel.includes(x));
   C.rm.table=C.rm.table.map(s=>s.filter(x=>!sel.includes(x)));
   if(target==null) C.rm.table.push(sel.slice());
+  else if(!C.rm.table[target]) return;
   else { const s=C.rm.table[target].concat(sel); const z=R.analyze(s); C.rm.table[target]= z ? z.order : s; }
   C.rm.table=C.rm.table.filter(s=>s.length);
   C.rm.sel=[]; Snd.play(); renderRM();
 }
 $('rmRack').addEventListener('click', e=>{
   const t=e.target.closest('.rt'); const V=C&&C.V; if(!t||!V||V.turn!==V.me||V.over) return;
+  if(C.rm.justDragged && Date.now()-C.rm.justDragged<350) return;
   const id=+t.dataset.id; C.rm.sel = C.rm.sel.includes(id) ? C.rm.sel.filter(x=>x!==id) : C.rm.sel.concat(id); Snd.tap(); renderRM();
 });
 $('rmTable').addEventListener('click', e=>{
   const V=C&&C.V; if(!V||V.turn!==V.me||V.over) return;
+  if(C.rm.justDragged && Date.now()-C.rm.justDragged<350) return;
   const add=e.target.closest('[data-add]'); if(add){ rmMoveSel(+add.dataset.add); return; }
   if(e.target.closest('#rmNewSet')){ rmMoveSel(null); return; }
   const t=e.target.closest('.rt'); if(!t) return;
@@ -1488,6 +1518,52 @@ $('rmTable').addEventListener('click', e=>{
   if(!st.has(id) && !C.rm.sel.length){ C.rm.table=C.rm.table.map(s=>s.filter(x=>x!==id)).filter(s=>s.length); C.rm.rack.push(id); Snd.tap(); renderRM(); return; }
   C.rm.sel = C.rm.sel.includes(id) ? C.rm.sel.filter(x=>x!==id) : C.rm.sel.concat(id); Snd.tap(); renderRM();
 });
+/* 拉密拖拉：按住一張牌拖到某一組（加進去）、拖到桌面空白處（開新組）、拖回手牌（收回） */
+let rmDrag=null;
+function rmDropTarget(x, y){
+  const el=document.elementFromPoint(x, y); if(!el) return null;
+  const set=el.closest('.rset'); if(set) return {kind:'set', i:+set.dataset.set, el:set};
+  if(el.closest('#rmRack')) return {kind:'rack', el:$('rmRack')};
+  if(el.closest('#rmTable')) return {kind:'new', el:$('rmTable')};
+  return null;
+}
+function rmClearDrop(){ document.querySelectorAll('.rdrop').forEach(e=>e.classList.remove('rdrop')); }
+document.addEventListener('pointerdown', e=>{
+  const t=e.target.closest('#rmRack .rt, #rmTable .rt'); const V=C&&C.V;
+  if(!t||!V||V.type!=='rm'||V.turn!==V.me||V.over) return;
+  rmDrag={id:+t.dataset.id, pid:e.pointerId, x0:e.clientX, y0:e.clientY, started:false, fromTable:!!t.closest('#rmTable')};
+});
+document.addEventListener('pointermove', e=>{
+  if(!rmDrag||e.pointerId!==rmDrag.pid) return;
+  if(!rmDrag.started){
+    if(Math.hypot(e.clientX-rmDrag.x0, e.clientY-rmDrag.y0) < 10) return;
+    const V=C.V, st=new Set(C.rm.start);
+    if(rmDrag.fromTable && st.has(rmDrag.id) && !V.melded[V.me]){ rmDrag=null; toast('第一次出牌不能動桌上的牌'); Snd.err(); return; }
+    rmDrag.tiles = C.rm.sel.includes(rmDrag.id) ? C.rm.sel.slice() : [rmDrag.id];
+    rmDrag.started=true;
+    const g=$('rmDragEl'); g.innerHTML=rmDrag.tiles.map(id=>rmTile(id)).join(''); g.hidden=false;
+    document.querySelectorAll('#rmRack .rt, #rmTable .rt').forEach(el=>{ if(rmDrag.tiles.includes(+el.dataset.id)) el.classList.add('ghost'); });
+    Snd.tap();
+  }
+  e.preventDefault();
+  const g=$('rmDragEl'); g.style.transform=`translate(${e.clientX-20}px, ${e.clientY-70}px) rotate(-4deg)`;
+  rmClearDrop(); const tg=rmDropTarget(e.clientX, e.clientY-46);
+  if(tg){ tg.el.classList.add('rdrop'); if(tg.kind==='set'){ const z=R.analyze(C.rm.table[tg.i].concat(rmDrag.tiles)); tg.el.classList.toggle('rok', !!z); } }
+  rmDrag.target=tg;
+}, {passive:false});
+function rmDragEnd(e){
+  if(!rmDrag||e.pointerId!==rmDrag.pid) return;
+  const d=rmDrag; rmDrag=null; rmClearDrop(); $('rmDragEl').hidden=true;
+  document.querySelectorAll('.rt.ghost').forEach(el=>el.classList.remove('ghost'));
+  if(!d.started) return;
+  C.rm.justDragged=Date.now();
+  const tg=d.target;
+  if(!tg) { renderRM(); return; }
+  if(tg.kind==='rack'){ if(d.fromTable) rmMoveSel('rack', d.tiles); else renderRM(); return; }
+  rmMoveSel(tg.kind==='set' ? tg.i : null, d.tiles);
+}
+document.addEventListener('pointerup', rmDragEnd);
+document.addEventListener('pointercancel', rmDragEnd);
 $('rmUndo').addEventListener('click', ()=>{ rmReset(); Snd.tap(); renderRM(); });
 $('rmSort').addEventListener('click', ()=>{ store.set('jk_rmsort', store.get('jk_rmsort','col')==='col'?'num':'col'); Snd.tap(); renderRM(); });
 $('rmDraw').addEventListener('click', ()=>{ rmReset(); sendAct({k:'draw'}); });

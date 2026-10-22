@@ -680,6 +680,26 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 .gcard[aria-pressed="true"] .gicon{background:linear-gradient(160deg,#FFF6D6,#FFE1EC)}
 .gcard b{font-size:18px;line-height:1.2}
 .gcard span{font-size:11px;line-height:1.35}
+
+/* ---------- 排七：可以出的牌（大按鈕，不重疊） ---------- */
+#q7{display:flex;align-items:center;gap:8px;flex-wrap:wrap;--cw:44px;--ch:62px;padding:2px 0}
+.q7l{font-size:12px;font-weight:900;background:var(--sun);border:2px solid var(--ink);border-radius:8px;padding:2px 6px}
+.card.q7c{position:relative;top:auto;left:auto;border-color:var(--ink);box-shadow:0 0 0 3px var(--sun),3px 4px 0 var(--ink);animation:pop .25s ease-out}
+.card.q7c.sel{transform:translateY(-6px);box-shadow:0 0 0 3px var(--pink),3px 5px 0 var(--ink)}
+.g-seven #me{gap:4px}
+
+/* ---------- 拉密拖拉 ---------- */
+.g-rm .rt{touch-action:none}
+#rmDragEl{position:fixed;left:0;top:0;z-index:40;pointer-events:none;display:flex;gap:2px;filter:drop-shadow(0 10px 8px rgba(27,27,58,.4));will-change:transform}
+#rmDragEl .rt{width:34px;height:46px}
+#rmDragEl .rt b{font-size:20px}
+.rt.ghost{opacity:.3}
+.rset.rdrop{box-shadow:0 0 0 3px var(--red);transform:scale(1.04)}
+.rset.rdrop.rok{box-shadow:0 0 0 3px #2BB673;background:rgba(214,255,228,.9)}
+#rmTable.rdrop{box-shadow:inset 0 0 0 4px #fff,4px 4px 0 var(--ink)}
+#rmRack.rdrop{background:rgba(255,241,194,.8);border-radius:12px}
+.rset{transition:transform .12s}
+#rmTable .rt{width:30px;height:40px}
 </style>
 </head>
 <body>
@@ -855,6 +875,7 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
         <span id="selInfo"></span>
       </div>
       <div id="myCov" hidden></div>
+      <div id="q7" hidden></div>
       <div id="quick" aria-label="快速選牌"></div>
       <div id="hand"></div>
     </div>
@@ -916,7 +937,7 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
       ・第一次出牌只能用自己手上的牌，點數加起來要滿 30。<br>
       ・之後可以把桌上的牌拆開、重新組合，只要回合結束時桌上每一組都成立，而且你至少出了一張。<br>
       ・不出牌就摸一張。先把手牌出完的人贏，其他人按手上剩的點數排名（鬼牌算 30 點）。<br>
-      ・操作：點牌選起來 → 按某一組旁邊的「＋」加進去，或按「用選的牌開新組」→ 按「完成」。點你這回合剛放上桌的牌可以收回。
+      ・操作：按住一張牌拖到某一組就加進去，拖到桌上空白處就開新組，拖回手牌就收回（只限這回合剛放的）。也可以先點好幾張牌選起來，再一起拖。擺好按「完成」。
     </p>
     <p class="note" id="rules2" style="color:var(--ink)">
       ・2 人每人 26 張、3 人每人 17 張（多的 1 張給拿梅花 3 的人）、4 人每人 13 張。<br>
@@ -1008,18 +1029,19 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 </div>
 
 <div id="bkDragEl" hidden></div>
+<div id="rmDragEl" hidden></div>
 <div id="emoBanner" aria-live="polite"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="fx"></div>
 
-<script src="peerjs.min.js?v=202610222234"></script>
-<script src="engine.js?v=202610222234"></script>
-<script src="seven.js?v=202610222234"></script>
-<script src="mahjong.js?v=202610222234"></script>
-<script src="blokus.js?v=202610222234"></script>
-<script src="rummi.js?v=202610222234"></script>
-<script src="progress.js?v=202610222234"></script>
-<script src="app.js?v=202610222234"></script>
+<script src="peerjs.min.js?v=202610222244"></script>
+<script src="engine.js?v=202610222244"></script>
+<script src="seven.js?v=202610222244"></script>
+<script src="mahjong.js?v=202610222244"></script>
+<script src="blokus.js?v=202610222244"></script>
+<script src="rummi.js?v=202610222244"></script>
+<script src="progress.js?v=202610222244"></script>
+<script src="app.js?v=202610222244"></script>
 
 </body>
 </html>
