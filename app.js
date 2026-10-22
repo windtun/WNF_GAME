@@ -283,7 +283,7 @@ function viewFor(si){
     timed: !!H.deadline, left: H.deadline ? Math.max(0, H.deadline-Date.now()) : 0, online: H.online };
   if(H.type==='mj') Object.assign(V, mjView(si));
   else if(H.type==='big2') Object.assign(V, {table:S.table, first:S.first, done:S.done.slice(), status:S.status.slice()});
-  else Object.assign(V, {board:S.board, covN:S.covered.map(c=>c.length), myCov:S.covered[si].slice(), last:S.last, score:S.score||null});
+  else Object.assign(V, {board:S.board, covN:S.covered.map(c=>c.length), myCov:S.covered[si].slice(), last:S.last, score:S.score||null, covAll: S.over ? S.covered.map(c=>c.slice()) : null});
   return JSON.parse(JSON.stringify(V));
 }
 function broadcastState(){
@@ -472,7 +472,10 @@ function render2(){
 }
 
 const BOARD_SUITS=[3,2,1,0];
-const fakeS = () => { const V=C.V, h={}; h[V.me]=V.hand; return {hands:h, board:V.board, table:V.table, first:V.first, over:V.over, turn:V.turn}; };
+// 給提示／檢查用的「只看得到自己手牌」的牌局：別人的手牌只有張數，不會偷看
+const fakeS = () => { const V=C.V, hands=(V.counts||[]).map((n,i)=> i===V.me ? V.hand : new Array(n).fill(-1));
+  return {hands, board:V.board, table:V.table, first:V.first, over:V.over, turn:V.turn,
+    covered: hands.map((_,i)=> i===V.me ? (V.myCov||[]) : [])}; };
 function render7(){
   const V=C.V;
   for(let pi=0; pi<V.n; pi++){
@@ -542,7 +545,7 @@ function renderHand(first){
     const stepX = m>1 ? Math.min(cw+4, (W-cw-gaps*gap)/(m-1)) : 0;
     const total = (m-1)*stepX+gaps*gap+cw, off=Math.max(0,(W-total)/2);
     html += `<div class="row" style="height:${ch}px;margin-top:${r?0:14}px">` + part.map((c,i)=>
-      cardHTML(c.id, C.sel.includes(c.id)?'sel': can.includes(c.id)?'can': (can.length?'dim':''))
+      cardHTML(c.id, C.sel.includes(c.id)?('sel'+(can.includes(c.id)?' can':'')): can.includes(c.id)?'can': (can.length?'dim':''))
         .replace('class="card','style="left:'+(off+i*stepX+gi[i]*gap).toFixed(1)+'px;animation-delay:'+((r*per+i)*35)+'ms" class="card')).join('') + '</div>';
   }
   if(!h.length) html=`<div style="height:${ch+14}px;display:grid;place-items:center;color:var(--ink-soft)">${seven?'你出完了，等其他人出完':'你出完了，等其他人比完名次'}</div>`;
@@ -559,6 +562,7 @@ function updateButtons(){
     $('btnSort').textContent = sort==='suit' ? '排大小' : '排花色';
     const pts=V.myCov.reduce((a,id)=>a+X.pts(id),0);
     $('selInfo').textContent = `已蓋 ${V.myCov.length} 張 · ${pts} 點`;
+    renderMyCov();
     return;
   }
   const myTurn=V.turn===V.me && !V.over && !V.done[V.me];
@@ -713,6 +717,15 @@ $('btnRestore').addEventListener('click', ()=>{
 })();
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 
+/* 排七：自己蓋的牌 */
+function covCards(ids){ return [...ids].sort((a,b)=>B.su(b)-B.su(a)||X.nat(a)-X.nat(b)).map(id=>cardHTML(id,'mc')).join(''); }
+function renderMyCov(){
+  const V=C.V, el=$('myCov');
+  if(!V || V.type!=='seven' || !V.myCov.length){ el.hidden=true; el.innerHTML=''; return; }
+  el.hidden=false;
+  el.innerHTML = `<span class="mclbl">我蓋的牌</span><div class="mcs">${covCards(V.myCov)}</div>`;
+}
+
 /* 結算 */
 function finish(){
   const V=C.V, place=V.order.indexOf(V.me);
@@ -729,7 +742,7 @@ function finish(){
       const st2=store.get(SKEY[V.type],{})[nm];
       $('resSub').textContent = st2 ? `${GNAME[V.type]}累計 ${st2.games} 局，第一名 ${st2.places[0]} 次` : '';
       $('resList').innerHTML = C.V.order.map((pi,k)=>{ const p=C.V.players[pi];
-        return `<div class="rk p${k+1} ${pi===C.V.me?'me':''}"><span class="no">${k+1}</span><div class="av">${avatar(p.kind)}</div><span class="nm">${esc(p.name)}</span>${C.V.type==='mj'?`<span class="stat">${C.V.scores[pi]>0?'+':''}${C.V.scores[pi]} 分</span>`:''}${C.V.type==='seven'&&C.V.score?`<span class="stat">蓋 ${C.V.covN[pi]} 張 · ${C.V.score[pi]} 點</span>`:''}</div>`; }).join('');
+        return `<div class="rk p${k+1} ${pi===C.V.me?'me':''}"><span class="no">${k+1}</span><div class="av">${avatar(p.kind)}</div><span class="nm">${esc(p.name)}</span>${C.V.type==='mj'?`<span class="stat">${C.V.scores[pi]>0?'+':''}${C.V.scores[pi]} 分</span>`:''}${C.V.type==='seven'&&C.V.score?`<span class="stat">蓋 ${C.V.covN[pi]} 張 · ${C.V.score[pi]} 點</span>`:''}</div>${C.V.type==='seven'&&C.V.covAll&&C.V.covAll[pi].length?`<div class="rcov">${covCards(C.V.covAll[pi])}</div>`:''}`; }).join('');
       const isHost = C.mode==='host', online = isHost ? H.online : true;
       $('btnAgain').hidden = !isHost; $('btnRoom').hidden = !(isHost && online);
       $('btnHome').textContent = online ? '離開房間' : '回大廳';

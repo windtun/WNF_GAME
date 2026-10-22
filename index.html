@@ -566,6 +566,18 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 .linewarn .candy{text-align:center;text-decoration:none;font-size:16px;padding:10px}
 .bk{font:inherit;font-family:ui-monospace,Menlo,monospace;font-size:11px;width:100%;box-sizing:border-box;border:2.5px solid var(--ink);border-radius:12px;padding:8px;background:var(--lav);color:var(--ink);resize:vertical;word-break:break-all;user-select:text;-webkit-user-select:text}
 .stsheet .rbtns>button{flex:1 1 30%}
+
+/* ---------- 排七：我蓋的牌 ---------- */
+#myCov{display:flex;align-items:center;gap:8px;background:#FFF1C2;border:2px solid var(--ink);border-radius:12px;padding:4px 8px;box-shadow:2px 2px 0 var(--ink);min-width:0}
+.mclbl{font-size:12px;font-weight:900;white-space:nowrap;flex:none}
+.mcs,.rcov{display:flex;flex-wrap:wrap;gap:3px;min-width:0;--cw:24px;--ch:34px}
+.card.mc{position:relative;top:auto;left:auto;cursor:default;box-shadow:1px 1.5px 0 var(--ink);border-width:1.5px}
+.card.mc .cs{display:none}
+.card.mc .cr{font-size:11px;top:3px;left:3px}
+.card.mc .cb{font-size:12px;right:2px;bottom:2px}
+.rk{flex-wrap:wrap}
+.rcov{width:100%;padding:2px 0 0 38px}
+#resList .rk + .rcov{margin-top:-4px}
 </style>
 </head>
 <body>
@@ -711,6 +723,7 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
         <span id="meName"></span><span id="meTag"></span>
         <span id="selInfo"></span>
       </div>
+      <div id="myCov" hidden></div>
       <div id="quick" aria-label="快速選牌"></div>
       <div id="hand"></div>
     </div>

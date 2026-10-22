@@ -286,6 +286,26 @@
       P.equip[it.cat] = id; save(); return true;
     }
 
+    /* ---------- 備份碼 ---------- */
+    const B64 = (str) => { const b = new TextEncoder().encode(str); let bin = ''; b.forEach(x => (bin += String.fromCharCode(x))); return btoa(bin); };
+    const UNB64 = (b64) => { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new TextDecoder().decode(u); };
+    function exportCode(nick) {
+      const data = { p: P, nick: nick || '', at: now() };
+      return 'JK1-' + B64(JSON.stringify(data));
+    }
+    function importCode(code) {
+      try {
+        const m = String(code || '').replace(/\s+/g, '').match(/JK1-([A-Za-z0-9+/=]+)/);
+        if (!m) return { err: '這不是揪咖打牌的備份碼' };
+        const d = JSON.parse(UNB64(m[1]));
+        const np = d && d.p;
+        if (!np || np.v !== 1 || typeof np.coins !== 'number' || typeof np.rp !== 'number' || !Array.isArray(np.owned)) return { err: '備份碼不完整，請整段重新複製' };
+        P = np; if (!P.ach) P.ach = {}; if (!P.st) P.st = newStats();
+        P.lastBackup = now(); save();
+        return { ok: true, nick: d.nick || '', at: d.at };
+      } catch (e) { return { err: '備份碼讀不出來，請確認有整段複製' }; }
+    }
+
     /* ---------- 朋友（連線時互相交換的真實資料） ---------- */
     function seeFriend(name, info) {
       if (!name || !info) return;
@@ -300,6 +320,7 @@
       theme: () => (item(P.equip.table) || item('tb_mint')).theme,
       emoLines: () => (item(P.equip.emo) || item('em_basic')).lines,
       card: () => ({ rp: P.rp, kind: (item(P.equip.avatar) || item('av_pup')).kind, wins: P.wins }),
+      exportCode, importCode, markBackup: () => { P.lastBackup = now(); save(); }, needBackup: () => P.games >= 3 && (!P.lastBackup || now() - P.lastBackup > 7 * 86400000),
     };
   }
 

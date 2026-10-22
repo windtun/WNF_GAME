@@ -2,18 +2,6 @@
 
 和朋友用手機連線玩的大老二、排七和台灣十六張麻將，人不夠的座位會由電腦補上。全部免費，不用架伺服器。
 
-## 放上 GitHub Pages（約 5 分鐘，只需要瀏覽器）
-
-1. 登入 github.com，點右上角的「+」，選「New repository」。
-2. Repository name 填 `jiuka`，選擇 **Public**，按「Create repository」。
-3. 在新建立的 repository 頁面，點「uploading an existing file」。
-4. 把這個資料夾裡的檔案全部拖進去：`index.html`、`app.js`、`engine.js`、`seven.js`、`mahjong.js`、`progress.js`、`peerjs.min.js`、`README.md`。拖完按「Commit changes」。
-5. 進到「Settings」→ 左邊選單的「Pages」。
-6. 「Source」選 **Deploy from a branch**，「Branch」選 **main**、資料夾選 **/ (root)**，按「Save」。
-7. 等 1～2 分鐘，網址就會出現在同一頁上方，格式是：
-   `https://你的帳號.github.io/jiuka/`
-
-之後要更新，只要用新檔案重複第 3～4 步覆蓋舊檔即可。
 
 ## 怎麼跟朋友玩
 
@@ -29,5 +17,6 @@
 - 每回合限時 30 秒。時間到時，大老二會自動「過」，排七會自動幫你出牌或蓋牌。
 - 麻將打牌限時 20 秒，時間到會自動幫你打一張；別人打牌後，吃碰槓胡有 8 秒可以決定，沒按就當作「過」。
 - 連線用的是 PeerJS 的免費配對服務。少數行動網路之間可能連不上，遇到時改用 Wi-Fi 試試看。
-- 金幣、積分、段位、戰績都存在各自的手機裡，換手機或清除瀏覽器資料會重來。
+- 金幣、積分、段位、戰績都存在各自的手機裡，換手機或清除瀏覽器資料會重來。可以在「戰績 → 備份／還原」複製備份碼存起來。
+- 不要在 LINE 裡面直接玩。邀請連結已經加了 openExternalBrowser=1，從 LINE 點開會自動改用手機瀏覽器；如果還是在 LINE 裡開了，大廳會出現提醒按鈕。
 - 世界排行的其他玩家是電腦模擬的對手；「朋友」分頁是一起連線玩過的真人。

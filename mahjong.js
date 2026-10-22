@@ -17,8 +17,16 @@
   }
   const LEFT_END = 16; // 留 16 張（八墩）
 
+  // 洗牌：Fisher-Yates，亂數來自瀏覽器的密碼學等級亂數（crypto.getRandomValues），沒有偏差
+  function randInt(n) {
+    const c = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto : null;
+    if (!c) return Math.floor(Math.random() * n);
+    const lim = Math.floor(4294967296 / n) * n, buf = new Uint32Array(1);
+    let x; do { c.getRandomValues(buf); x = buf[0]; } while (x >= lim);
+    return x % n;
+  }
   function shuffle(a) {
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    for (let i = a.length - 1; i > 0; i--) { const j = randInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
     return a;
   }
   const counts = ids => { const c = new Array(34).fill(0); ids.forEach(i => { if (!isFlower(i)) c[kind(i)]++; }); return c; };
@@ -103,7 +111,7 @@
 
   /* ---------- 一場（多局） ---------- */
   function newMatch(length) {
-    const M = { length: length || 'round', scores: [0, 0, 0, 0], dealer: Math.floor(Math.random() * 4), wind: 0, streak: 0, hands: 0, over: false, history: [] };
+    const M = { length: length || 'round', scores: [0, 0, 0, 0], dealer: randInt(4), wind: 0, streak: 0, hands: 0, over: false, history: [] };
     M.firstDealer = M.dealer;
     return newHand(M);
   }

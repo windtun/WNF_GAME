@@ -113,8 +113,16 @@
     return out;
   }
 
+  // 洗牌：Fisher-Yates，亂數來自瀏覽器的密碼學等級亂數（crypto.getRandomValues），沒有偏差
+  function randInt(n) {
+    const c = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto : null;
+    if (!c) return Math.floor(Math.random() * n);
+    const lim = Math.floor(4294967296 / n) * n, buf = new Uint32Array(1);
+    let x; do { c.getRandomValues(buf); x = buf[0]; } while (x >= lim);
+    return x % n;
+  }
   function shuffle(a) {
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    for (let i = a.length - 1; i > 0; i--) { const j = randInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
     return a;
   }
 
