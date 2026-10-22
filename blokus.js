@@ -134,7 +134,45 @@
 
   /* ---------- 電腦 ----------
      普通：先放大塊、多開自己的角、搶別人的角、早期往中間擴張 */
+  /* 困難：先用普通版的評分挑出前幾名，再往前看一步：
+     放下去之後「我還有多少能下的角」和「對手剩多少能下的角」，搶地盤也封別人的路 */
+  const HB = { mine: 3, theirs: 3.5, k: 20 };
+  function aiHard(S, p) {
+    const moves = legalMoves(S, p);
+    if (!moves.length) return null;
+    const scored = moves.map(m => ({ m, v: scoreMove(S, p, m) })).sort((a, b) => b.v - a.v).slice(0, HB.k);
+    let best = null, bv = -Infinity;
+    for (const { m, v } of scored) {
+      m.cells.forEach(([x, y]) => (S.board[y * S.N + x] = p));
+      const wasFirst = S.first[p]; S.first[p] = false;
+      const mine = anchors(S, p).length;
+      let theirs = 0;
+      for (let q = 0; q < S.n; q++) if (q !== p && !S.out[q]) theirs += anchors(S, q).length;
+      S.first[p] = wasFirst;
+      m.cells.forEach(([x, y]) => (S.board[y * S.N + x] = -1));
+      const val = v + mine * HB.mine - theirs * HB.theirs / Math.max(1, S.n - 1);
+      if (val > bv) { bv = val; best = m; }
+    }
+    return best;
+  }
+  function scoreMove(S, p, m, cache) {
+    const remain = S.left[p].length, c = (S.N - 1) / 2, early = 21 - remain;
+    const set = new Set(m.cells.map(([x, y]) => y * S.N + x));
+    let newCorners = 0;
+    for (const [x, y] of m.cells) for (const [dx, dy] of DIAG) {
+      const nx = x + dx, ny = y + dy;
+      if (at(S, nx, ny) !== -1 || set.has(ny * S.N + nx)) continue;
+      if (ORTH.some(([ex, ey]) => at(S, nx + ex, ny + ey) === p || set.has((ny + ey) * S.N + nx + ex))) continue;
+      newCorners++;
+    }
+    const dist = Math.min(...m.cells.map(([x, y]) => Math.abs(x - c) + Math.abs(y - c)));
+    let v = SIZE[m.piece] * 6 + newCorners * 1.6;
+    if (early < 6) v -= dist * 1.4;
+    if (m.piece === 0 && remain > 2) v -= 6;
+    return v;
+  }
   function aiChoose(S, p, diff) {
+    if (diff === 'hard') return aiHard(S, p);
     let moves = legalMoves(S, p);
     if (!moves.length) return null;
     if (diff === 'easy') {
@@ -169,7 +207,7 @@
     return best;
   }
 
-  const API = { SHAPES, SIZE, ORIENTS, rotate, flip, norm, newGame, anchors, legalMoves, hasMove, validate, place, pass, aiChoose };
+  const API = { HB, SHAPES, SIZE, ORIENTS, rotate, flip, norm, newGame, anchors, legalMoves, hasMove, validate, place, pass, aiChoose };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.Blokus = API;
 })(this);

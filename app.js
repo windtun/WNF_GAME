@@ -208,7 +208,8 @@ function hostConn(w){
     if(m.t==='join'){ cid=String(m.cid||''); hostJoin(w, m); }
     else if(m.t==='act'){ const si=H.seats.findIndex(s=>s.cid===cid); if(si<0||!H.started) return;
       const err = hostAct(si, m.a); if(err) w.send({t:'err', msg:err}); }
-    else if(m.t==='emo'){ const si=H.seats.findIndex(s=>s.cid===cid); if(si>=0) hostEmo(si, m.e); }
+    else if(m.t==='emo'){ const si=H.seats.findIndex(s=>s.cid===cid); if(si>=0) hostEmo(si, m.e, m.fx); }
+    else if(m.t==='peek'){ const si=H.seats.findIndex(s=>s.cid===cid); if(si>=0) hostPeek(si, m.p); }
     else if(m.t==='leave'){ hostDrop(cid, w, true); }
   });
   w.onClose(()=>{ if(cid) hostDrop(cid, w, false); });
@@ -304,7 +305,7 @@ function hostSchedule(first){
   const s=H.seats[S.turn], gid=H.gid, ver=S.ver, turn=S.turn;
   const guard = ()=> H && H.gid===gid && H.S.ver===ver && H.S.turn===turn && !H.S.over;
   if(!s.human || !s.online){
-    H.timer=setTimeout(()=>{ if(guard()) botMove(false); }, (first?1300:0) + (s.human?1000:650+Math.random()*500));
+    H.timer=setTimeout(()=>{ if(guard()) botMove(false); }, (first?1300:0) + (s.human?1000:(H.type==='bk'||H.type==='rm')?350+Math.random()*350:650+Math.random()*500));
   } else if(H.online && humans().length>1){
     const ms = (H.type==='rm' ? 60000 : TURN_MS) + (first?1500:0);
     H.deadline = Date.now() + ms;
@@ -314,12 +315,20 @@ function hostSchedule(first){
 
 function botMove(timeout){
   const S=H.S, si=S.turn, diff = H.seats[si].human ? 'normal' : H.diff;
+  const gid=H.gid, ver=S.ver, later=(ms, f)=>{ H.timer=setTimeout(()=>{ if(H && H.gid===gid && H.S.ver===ver && H.S.turn===si && !H.S.over) f(); }, ms); };
   if(H.type==='bk'){
     const m=K.aiChoose(S, si, diff);
-    applyAct(si, m ? {k:'place', piece:m.piece, cells:m.cells} : {k:'pass'});
+    if(!m){ applyAct(si, {k:'pass'}); return; }
+    // 先讓大家看到方塊滑到位置，再放下
+    const dx=m.cells[0][0] < S.N/2 ? 2 : -2, dy=m.cells[0][1] < S.N/2 ? 2 : -2;
+    hostPeek(si, {cells:m.cells.map(([x,y])=>[x+dx,y+dy]), pc:m.piece});
+    later(260, ()=>{ hostPeek(si, {cells:m.cells.map(([x,y])=>[x+(dx>>1),y+(dy>>1)]), pc:m.piece});
+      later(260, ()=>{ hostPeek(si, {cells:m.cells, pc:m.piece}); later(480, ()=>applyAct(si, {k:'place', piece:m.piece, cells:m.cells})); }); });
   } else if(H.type==='rm'){
     const m = timeout ? {t:'draw'} : R.aiChoose(S, si, diff);
-    applyAct(si, m.t==='draw' ? {k:'draw'} : {k:'commit', table:m.table});
+    if(m.t==='draw'){ applyAct(si, {k:'draw'}); return; }
+    hostPeek(si, {table:m.table, drag:null});
+    later(1100, ()=>applyAct(si, {k:'commit', table:m.table}));
   } else if(H.type==='seven'){
     const c=X.aiChoose(S, si, diff);
     applyAct(si, c.play!=null ? {k:'play7', id:c.play} : {k:'cover', id:c.cover});
@@ -357,9 +366,54 @@ function applyAct(si, a){
   broadcastState();
   return null;
 }
-function hostEmo(si, e){
-  const m={t:'emo', by:si, e:String(e).slice(0,12)};
-  H.conns.forEach(w=>w.send(m)); showEmo(si, m.e, true);
+/* 即時動作：輪到的人正在拖的方塊／正在擺的牌，傳給其他人看 */
+function hostPeek(si, p){
+  const S=H&&H.S; if(!H||!H.started||!S||S.over||S.turn!==si||!p||typeof p!=='object') return;
+  let q=null;
+  if(H.type==='bk'){
+    const cells = Array.isArray(p.cells) ? p.cells.slice(0,5).map(c=>[c[0]|0, c[1]|0]).filter(c=>c[0]>=-6&&c[1]>=-6&&c[0]<S.N+6&&c[1]<S.N+6) : null;
+    q={cells: cells&&cells.length?cells:null, pc: p.pc==null?null:(p.pc|0)};
+  } else if(H.type==='rm'){
+    if(!Array.isArray(p.table)) return;
+    const ok=new Set(S.table.flat().concat(S.racks[si])), seen=new Set(), table=[];
+    for(const set of p.table.slice(0,60)){ if(!Array.isArray(set)) return; const t=[];
+      for(const x of set){ const id=x|0; if(!ok.has(id)||seen.has(id)) return; seen.add(id); t.push(id); } if(t.length) table.push(t); }
+    let drag=null;
+    if(p.drag && Array.isArray(p.drag.ids)){ const ids=p.drag.ids.slice(0,14).map(x=>x|0).filter(x=>ok.has(x));
+      if(ids.length) drag={ids, x:Math.max(0,Math.min(1,+p.drag.x||0)), y:Math.max(0,Math.min(1,+p.drag.y||0))}; }
+    q={table, drag};
+  } else return;
+  const m={t:'peek', by:si, ver:S.ver, p:q}, sc=H.seats[si].cid;
+  H.conns.forEach((w,cid)=>{ if(cid!==sc) w.send(m); });
+  if(sc!==myCid) onPeek(m);
+}
+function onPeek(m){
+  if(!C||!C.V||m.ver!==C.V.ver) return;
+  C.peek={by:m.by, ver:m.ver, p:m.p, at:Date.now()};
+  if(C.peekRaf) return;
+  C.peekRaf=requestAnimationFrame(()=>{ C.peekRaf=0; if(!C||!C.V) return; if(C.V.type==='bk') renderBK(); else if(C.V.type==='rm') renderRM(); });
+}
+function livePeek(){
+  const k=C&&C.peek, V=C&&C.V;
+  return (k && V && k.ver===V.ver && k.by===V.turn && k.by!==V.me && !V.over && Date.now()-k.at<15000) ? k : null;
+}
+let peekLast='', peekTimer=null, peekPending=null, peekAt=0;
+function peekSend(p){
+  if(!C||!C.V) return;
+  if(!(C.mode==='guest' || (H && H.online && H.conns.size))) return;
+  const j=C.V.ver+'|'+JSON.stringify(p); if(j===peekLast) return; peekLast=j; peekPending=p;
+  if(peekTimer) return;
+  peekTimer=setTimeout(()=>{ peekTimer=null; peekAt=Date.now(); const q=peekPending; peekPending=null; if(!C||!C.V||!q) return;
+    if(C.mode==='guest'){ C.conn && C.conn.send({t:'peek', p:q}); } else if(H) hostPeek(C.me, q); }, Math.max(0, 110-(Date.now()-peekAt)));
+}
+function turnBanner(){
+  const el=document.createElement('div'); el.className='turnban'; el.innerHTML='<b>輪到你了！</b>';
+  $('emoFx').appendChild(el); setTimeout(()=>el.remove(), 1500);
+  try{ navigator.vibrate && navigator.vibrate([40,60,40]); }catch(e){}
+}
+function hostEmo(si, e, fx){
+  const m={t:'emo', by:si, e:String(e).slice(0,12), fx: FX_IDS.includes(fx) ? fx : 'fx_bubble'};
+  H.conns.forEach(w=>w.send(m)); showEmo(si, m.e, true, m.fx);
 }
 
 /* ================= 每個玩家的畫面（房主自己也是） ================= */
@@ -386,12 +440,12 @@ function applyView(V){
     C.lastSeq=V.ev.seq;
     if(V.ev.by===V.me){ C.sel=[]; C.hint=-1; C.qt=null; }
   }
-  if(!fresh && V.turn===V.me && prevTurn!==V.me && !V.over) Snd.turn();
+  if(!fresh && V.turn===V.me && prevTurn!==V.me && !V.over){ Snd.turn(); if(V.type==='bk'||V.type==='rm') turnBanner(); }
   if(!fresh && V.type==='mj' && V.claim && V.claim.mine && !V.claim.answered && !(C.claimSeen===V.claim.tile+'|'+V.ver)){ C.claimSeen=V.claim.tile+'|'+V.ver; Snd.turn(); }
   if(V.type==='mj'){
     if(V.phase==='over' && V.result && V.result.type==='win' && V.result.winner===V.me){
       const hk=V.gid+'|'+V.handNo+'|'+(C.code||'local');
-      if(C.mjHandKey!==hk){ C.mjHandKey=hk; const r=Prog.recordMjHand({self:V.result.self, tai:V.result.total, names:V.result.tai.map(x=>x[0]), online:onlineWithFriends(), diff:C.mode==='host'?H.diff:'normal'}); C.mjHandCoins=r.coins; announceAch(r.unlocked); }
+      if(C.mjHandKey!==hk){ C.mjHandKey=hk; const r=Prog.recordMjHand({self:V.result.self, tai:V.result.total, names:V.result.tai.map(x=>x[0]), online:onlineWithFriends(), diff:C.mode==='host'?H.diff:(C.diff||'normal')}); C.mjHandCoins=r.coins; announceAch(r.unlocked); }
     }
     if(V.over) recordEnd(V);
     render(fresh);
@@ -561,9 +615,10 @@ function sortedHand(){
 }
 function renderHand(first){
   const V=C.V, hand=$('hand'), h=sortedHand(), W=hand.clientWidth||340, sort=curSort();
-  const cw=Math.max(44, Math.min(64, Math.floor(W/7.2))), ch=Math.round(cw*1.42);
+  const land = innerWidth>innerHeight && innerHeight<560;
+  const cw = land ? Math.max(38, Math.min(54, Math.floor(innerHeight*0.135))) : Math.max(44, Math.min(64, Math.floor(W/7.2))), ch=Math.round(cw*1.42);
   hand.style.setProperty('--cw',cw+'px'); hand.style.setProperty('--ch',ch+'px');
-  const rows = h.length>13 ? 2 : 1, per=Math.ceil(h.length/rows);
+  const rows = h.length>(land?20:13) ? 2 : 1, per=Math.ceil(h.length/rows);
   const seven=V.type==='seven', can = seven && V.turn===V.me && !V.over ? X.playable(fakeS(), V.me) : [];
   let html='';
   for(let r=0;r<rows;r++){
@@ -707,26 +762,78 @@ $('emoBar').addEventListener('click', e=>{
   const now=Date.now(); if(now-(C.emoAt||0)<1500) return; C.emoAt=now;
   $('emoBar').classList.add('cool'); setTimeout(()=>$('emoBar').classList.remove('cool'),1500);
   const t=b.textContent; Snd.tap();
-  if(C.mode==='guest'){ C.conn && C.conn.send({t:'emo', e:t}); }
-  else if(H) hostEmo(C.me, t);
+  if(C.mode==='guest'){ C.conn && C.conn.send({t:'emo', e:t, fx:Prog.fxId()}); }
+  else if(H) hostEmo(C.me, t, Prog.fxId());
 });
-function showEmo(pi, text, banner){
+const FX_IDS=['fx_bubble','fx_danmaku','fx_hearts','fx_boom','fx_cutin','fx_neon','fx_gold'];
+// 找說話的人在畫面上的位置（頭像）
+function seatRect(pi){
+  const V=C&&C.V; let el=null;
+  if(V){
+    const me=pi===V.me;
+    if(V.type==='mj') el = me ? $('mjMeInfo') : $('mjo'+pi);
+    else if(V.type==='bk') el = $('bkPlayers').children[pi];
+    else if(V.type==='rm') el = $('rmPlayers').children[pi];
+    else el = me ? $('me').querySelector('.meinfo .av') : $('seat'+D(pi));
+    if(el && el.querySelector && !me && el.querySelector('.av')) el = el.querySelector('.av') || el;
+  }
+  const r = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+  return r && r.width ? {x:r.left+r.width/2, y:r.top+r.height/2} : {x:innerWidth/2, y:innerHeight*0.3};
+}
+function fxNode(cls, html, ms){ const d=document.createElement('div'); d.className='efx '+cls; d.innerHTML=html; $('emoFx').appendChild(d); setTimeout(()=>d.remove(), ms); return d; }
+function playEmoFx(fx, pi, text, who, kind){
+  if(!FX_IDS.includes(fx)) fx='fx_bubble';
+  const p={x:0,y:0}, at = pi==null ? {x:innerWidth/2, y:innerHeight*0.32} : seatRect(pi), av=avatar(kind||'pup'), t=esc(text), w=esc(who);
+  const W=innerWidth, H=innerHeight;
+  if(fx==='fx_bubble'){
+    // 對話框放在頭像旁邊、往畫面中間偏
+    const bx=Math.min(W-130, Math.max(130, at.x + (W/2-at.x)*0.35)), by=Math.min(H-120, Math.max(110, at.y + (at.y<H/2 ? 95 : -95)));
+    const d=fxNode('ebubble', `<div class="eb ${at.y<H/2?'down':'up'}"><span class="ebav">${av}</span><span class="ebt"><small>${w}</small><b>${t}</b></span></div>`, 2700);
+    d.style.left=bx+'px'; d.style.top=by+'px';
+    d.style.setProperty('--tx', Math.max(-80,Math.min(80,(at.x-bx)))+'px');
+    Snd.emo();
+  } else if(fx==='fx_danmaku'){
+    const cols=['#FF4F8B','#2EC5FF','#FFD23F','#22B35A','#A15BE6','#fff'];
+    for(let k=0;k<7;k++){ const d=fxNode('edan', `${k%3===0?`<i>${w}：</i>`:''}${t}`, 3600);
+      d.style.top=(12+k*11+Math.random()*4)+'%'; d.style.color=cols[k%cols.length]; d.style.fontSize=(20+Math.random()*16)+'px'; d.style.animationDelay=(k*0.18+Math.random()*0.2)+'s'; d.style.animationDuration=(2.2+Math.random()*1)+'s'; }
+    [0,1,2].forEach(k=>Snd.tone(900+k*220,.06,{type:'square',vol:.04,at:k*.08}));
+  } else if(fx==='fx_hearts'){
+    const d=fxNode('ehtxt', `<b>${t}</b>`, 2800); d.style.left=Math.min(W-120,Math.max(120,at.x))+'px'; d.style.top=Math.max(90, at.y-40)+'px';
+    for(let k=0;k<14;k++){ const h=fxNode('eheart', '♥', 2600); h.style.left=(at.x+(Math.random()-.5)*120)+'px'; h.style.top=(at.y+10)+'px';
+      h.style.animationDelay=(Math.random()*0.8)+'s'; h.style.fontSize=(16+Math.random()*22)+'px'; h.style.setProperty('--dx',((Math.random()-.5)*80)+'px'); h.style.color=['#FF4F8B','#FF7FA0','#E8433F','#FFB3C7'][k%4]; }
+    [784,988,1175].forEach((f,k)=>Snd.tone(f,.18,{type:'triangle',vol:.08,at:k*.09}));
+  } else if(fx==='fx_boom'){
+    fx_boomText(t, w);
+  } else if(fx==='fx_cutin'){
+    fxNode('ecut', `<div class="ecband"><span class="ecav">${av}</span><span class="ectx"><small>${w}</small><b>${t}</b></span></div>`, 2600);
+    Snd.noise(.35,{freq:900,vol:.25}); Snd.tone(220,.25,{type:'sawtooth',vol:.08,to:660,at:.05}); Snd.tone(1320,.12,{type:'triangle',vol:.1,at:.32});
+  } else if(fx==='fx_neon'){
+    fxNode('eneon', `<small>${w}</small><b data-t="${t}">${t}</b>`, 2900);
+    [0,.25,.5].forEach(a=>Snd.tone(110,.12,{type:'sawtooth',vol:.05,at:a}));
+  } else if(fx==='fx_gold'){
+    fxNode('egold', `<small>${w}</small><b>${t}</b>`, 3200);
+    for(let k=0;k<26;k++){ const c=fxNode('ecoin', '', 3000); c.style.left=(Math.random()*100)+'%'; c.style.animationDelay=(Math.random()*1.2)+'s'; c.style.animationDuration=(1.4+Math.random()*1)+'s'; c.style.setProperty('--r',(Math.random()*720-360)+'deg'); }
+    Snd.win();
+  }
+}
+function fx_boomText(t, w){
+  const f=$('fx'); f.innerHTML=`<div class="boom pink"><small class="bw">${w}</small>${t}</div>`;
+  f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+  const tb=$('table'); tb.classList.remove('shake'); void tb.offsetWidth; tb.classList.add('shake');
+  clearTimeout(fx._t); fx._t=setTimeout(()=>{ f.innerHTML=''; f.classList.remove('on'); },1300);
+  Snd.bomb();
+}
+function showEmo(pi, text, banner, fxId){
   if(!C||!C.V) return;
   const V=C.V, mj=V.type==='mj', me=pi===V.me;
+  if(banner){ const p=V.players[pi]; playEmoFx(fxId||'fx_bubble', pi, text, me?'我':p.name, p.kind); return; }
+  // 碰、吃這類小提示：頭像上的小泡泡
   const el = mj ? (me ? $('mjMeInfo') : $('mjo'+pi)) : (me ? $('me').querySelector('.meinfo') : $('seat'+D(pi)));
   if(el){
     el.querySelectorAll('.bubble.emo').forEach(x=>x.remove());
-    const b=document.createElement('div'); b.className='bubble emo'+(banner?' talk':'');
+    const b=document.createElement('div'); b.className='bubble emo';
     b.innerHTML=`<span class="ein">${esc(text)}</span>`;
-    el.appendChild(b); setTimeout(()=>b.remove(), 3000);
-  }
-  if(banner){
-    Snd.emo();
-    // 跑馬燈：整條橫跨畫面中間，從右邊跑到左邊
-    const p=V.players[pi], bn=$('emoBanner');
-    bn.innerHTML=`<div class="emq"><span class="eav">${avatar(p.kind)}</span><small>${esc(me?'我':p.name)}</small><b>${esc(text)}</b><span class="eav">${avatar(p.kind)}</span><small>${esc(me?'我':p.name)}</small><b>${esc(text)}</b></div>`;
-    bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
-    clearTimeout(showEmo._t); showEmo._t=setTimeout(()=>bn.classList.remove('show'), 4200);
+    el.appendChild(b); setTimeout(()=>b.remove(), 2200);
   }
 }
 
@@ -1115,16 +1222,19 @@ function renderShop(){
     let pv='';
     if(it.cat==='avatar') pv=`<div class="spv av">${avatar(it.kind)}</div>`;
     else if(it.cat==='table') pv=`<div class="spv felt" data-th="${it.theme}"><i></i><i></i><i></i></div>`;
+    else if(it.cat==='fx') pv=`<div class="spv fxpv fx-${it.id.slice(3)}"><span>${esc(it.desc)}</span></div>`;
     else pv=`<div class="spv emo">${it.lines.slice(0,4).map(l=>`<span>${esc(l)}</span>`).join('')}</div>`;
     const btn = on ? '<button class="candy plain" disabled>使用中</button>' : own ? `<button class="candy sun" data-eq="${it.id}">使用</button>`
       : `<button class="candy" data-buy="${it.id}" ${P.coins<it.price?'disabled':''}>${coinIcon}${fmt(it.price)}</button>`;
-    return `<div class="sitem ${on?'on':''}">${pv}<b>${esc(it.name)}</b>${btn}</div>`;
+    const tryBtn = it.cat==='fx' ? `<button class="candy plain try" data-try="${it.id}">試看</button>` : '';
+    return `<div class="sitem ${on?'on':''}">${pv}<b>${esc(it.name)}</b>${tryBtn}${btn}</div>`;
   }).join('');
 }
 $('btnShop').addEventListener('click', ()=>{ Snd.init(); Snd.tap(); renderShop(); $('ovShop').hidden=false; });
 $('shopTabs').addEventListener('click', e=>{ const b=e.target.closest('.chip'); if(!b) return; shopTab=b.dataset.t; Snd.tap(); renderShop(); });
 $('shopGrid').addEventListener('click', e=>{
   const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.try){ Snd.init(); playEmoFx(b.dataset.try, null, ['快點啦','你完了','好牌！','就這？'][Math.floor(Math.random()*4)], '我', Prog.avatarKind()); return; }
   if(b.dataset.buy){ const r=Prog.buy(b.dataset.buy); if(r.err){ toast(r.err); Snd.err(); return; } Snd.win(); toast('買到了，已經換上'); }
   else if(b.dataset.eq){ Prog.equip(b.dataset.eq); Snd.tap(); toast('換好了'); }
   applyTheme(); renderShop(); renderProfile();
@@ -1145,7 +1255,7 @@ function recordEnd(V){
   const place=V.order.indexOf(V.me);
   const pts = V.type==='seven' ? V.myCov.reduce((a,id)=>a+X.pts(id),0) : null;
   const rivals = V.players.map((p,i)=>({p,i})).filter(x=>x.i!==V.me && !x.p.bot).map(x=>({name:x.p.name, kind:x.p.kind, beat: V.order.indexOf(x.i) > place}));
-  C.reward = Prog.recordGame({game:V.type, place, n:V.n, online:onlineWithFriends(), diff: C.mode==='host' ? H.diff : 'normal', bomb:(C.bombs||0)>0, bombs:C.bombs||0, sevenPts:pts, rivals});
+  C.reward = Prog.recordGame({game:V.type, place, n:V.n, online:onlineWithFriends(), diff: C.mode==='host' ? H.diff : (C.diff||'normal'), bomb:(C.bombs||0)>0, bombs:C.bombs||0, sevenPts:pts, rivals});
   C.bombs=0;
   announceAch(C.reward.unlocked);
   return C.reward;
@@ -1253,6 +1363,7 @@ function bkPivot(shape){ const cx=shape.reduce((a,c)=>a+c[0],0)/shape.length, cy
   let best=shape[0], bd=1e9; shape.forEach(c=>{ const d=(c[0]-cx)**2+(c[1]-cy)**2; if(d<bd){bd=d;best=c;} }); return best; }
 const bkShapeKey = sh => K.norm(sh).map(c=>c.join(',')).join(';');
 function bkCellsAt(shape, at){ const pv=bkPivot(shape); return shape.map(([x,y])=>[x-pv[0]+at[0], y-pv[1]+at[1]]); }
+function bkCanPrep(){ const V=C&&C.V; return !!V && V.type==='bk' && !V.over && !V.out[V.me] && V.pieces[V.me].length>0; }
 function bkCells(){ const b=C.bk; return (b && b.piece!=null && b.at) ? bkCellsAt(b.shape, b.at) : null; }
 function pieceSVG(shape, color, u){
   u=u||9; const w=Math.max(...shape.map(c=>c[0]))+1, h=Math.max(...shape.map(c=>c[1]))+1, r=u*0.22;
@@ -1290,8 +1401,12 @@ function bkRenderBoard(){
   const V=C.V, me=V.me, myTurn=V.turn===me && !V.over;
   const cells=$('bkBoard').children, ghost=bkCells(), gset=new Set();
   let legal=false;
-  if(ghost && myTurn){ legal = !K.validate(bkLocal(), me, C.bk.piece, ghost); ghost.forEach(([x,y])=>{ if(x>=0&&y>=0&&x<V.N&&y<V.N) gset.add(y*V.N+x); }); }
+  if(ghost){ if(myTurn) legal = !K.validate(bkLocal(), me, C.bk.piece, ghost); ghost.forEach(([x,y])=>{ if(x>=0&&y>=0&&x<V.N&&y<V.N) gset.add(y*V.N+x); }); }
   C.bk.legal=legal;
+  // 別人正在移動的方塊（即時看到）
+  const pk=livePeek(), pset=new Set();
+  if(pk && pk.p.cells) pk.p.cells.forEach(([x,y])=>{ if(x>=0&&y>=0&&x<V.N&&y<V.N) pset.add(y*V.N+x); });
+  $('bkBoard').style.setProperty('--pk', pk ? BK_COL[pk.by] : '');
   const spots = myTurn && C.bk.piece!=null ? bkSpots() : new Map();
   const anc = myTurn && C.bk.piece==null ? new Set(K.anchors(bkLocal(), me).map(([x,y])=>y*V.N+x)) : new Set();
   const last = V.last ? new Set(V.last.cells.map(([x,y])=>y*V.N+x)) : new Set();
@@ -1306,14 +1421,16 @@ function bkRenderBoard(){
     if(o<0 && anc.has(i)) cls+=' anc';
     if(o<0 && spots.has(i)) cls+=' spot';
     if(o<0 && starts.has(i) && V.first[starts.get(i)]) { cls+=' st'; el.style.setProperty('--sc', BK_COL[starts.get(i)]); }
-    if(gset.has(i)) cls+= legal ? ' gh ok' : ' gh bad';
+    if(gset.has(i)) cls+= !myTurn ? ' gh pre' : legal ? ' gh ok' : ' gh bad';
+    else if(pset.has(i)) cls+= o>=0 ? ' pk over' : ' pk';
     if(el.className!==cls) el.className=cls;
   }
   if(prev && cells.length){ [...cells].forEach((el,i)=>{ if(el.classList.contains('drop')) el.style.animationDelay=((i%7)*25)+'ms'; }); }
   C.bk.prevBoard=V.board.slice();
+  if(myTurn) peekSend({cells: ghost || null, pc: C.bk.piece});
   // 浮動操作列：貼在預覽方塊旁邊
   const fb=$('bkFloat');
-  if(ghost && myTurn && !C.bk.dragging){
+  if(ghost && !C.bk.dragging){
     const N=V.N, minY=Math.min(...ghost.map(c=>c[1])), maxY=Math.max(...ghost.map(c=>c[1])), cx=ghost.reduce((a,c)=>a+c[0],0)/ghost.length;
     const up = minY > N*0.35, W=$('bkBoard').getBoundingClientRect().width;
     fb.hidden=false;
@@ -1321,13 +1438,17 @@ function bkRenderBoard(){
     fb.style.left=Math.min(W-half-2, Math.max(half+2, px))+'px';
     fb.style.top = up ? (minY/N*100)+'%' : ((maxY+1)/N*100)+'%';
     fb.className = up ? 'up' : 'down';
-    $('bkfOk').disabled=!legal;
+    $('bkfOk').disabled=!legal || !myTurn;
   } else fb.hidden=true;
 }
 function renderBK(){
   const V=C.V, me=V.me, myTurn=V.turn===me && !V.over;
   if(!$('bkBoard').children.length || $('bkBoard').children.length!==V.N*V.N) bkBuild();
-  if(!myTurn && C.bk.piece!=null){ C.bk.piece=null; C.bk.at=null; }
+  if(!bkCanPrep() && C.bk.piece!=null){ C.bk.piece=null; C.bk.at=null; }
+  // 剛輪到自己：先擺好的方塊自動對準最近能放的位置
+  if(myTurn && !C.bk.wasMy && C.bk.piece!=null && C.bk.at){ const r=bkSnap(C.bk.at); if(r.snapped) C.bk.at=r.at; }
+  C.bk.wasMy=myTurn;
+  $('game').classList.toggle('myturn', myTurn); $('game').classList.toggle('waiting', !myTurn && !V.over);
   $('bkBoard').style.setProperty('--me', BK_COL[me]); $('bkFloat').style.setProperty('--me', BK_COL[me]);
   $('bkPlayers').innerHTML = V.players.map((p,i)=>`<div class="bkp ${V.turn===i&&!V.over?'turn':''} ${V.out[i]?'out':''} ${i===me?'me':''}" style="--pc:${BK_COL[i]}">
     <span class="bkav">${avatar(p.kind)}</span><span class="bkn">${esc(i===me?'我':p.name)}</span>
@@ -1338,12 +1459,14 @@ function renderBK(){
     `<button class="bkpc ${C.bk.piece===pc?'on':''} ${myTurn&&!can.has(pc)?'no':''}" data-pc="${pc}" aria-label="${K.SIZE[pc]} 格方塊">${pieceSVG(C.bk.piece===pc?C.bk.shape:K.SHAPES[pc], BK_COL[me], 9)}</button>`).join('')
     || '<span class="note">全部放完了！</span>';
   const ghost=bkCells();
+  const pk=livePeek();
   const tag = V.over ? '這局結束' : myTurn ? (C.bk.piece==null ? '把下面的方塊拖到棋盤上，或點一下選起來' : ghost ? (C.bk.legal ? '可以放！按 ✓ 確定' : '這裡不能放，拖到亮點的位置') : '亮點是這塊能放的位置，點一下或拖過去')
-    : `等 ${esc(V.players[V.turn].name)} 放方塊…`;
+    : (pk ? `<b class="pkname" style="--pc:${BK_COL[V.turn]}">${esc(V.players[V.turn].name)}</b> 正在移動方塊…` : `等 ${esc(V.players[V.turn].name)} 放方塊…`)
+      + (bkCanPrep() ? (C.bk.piece!=null ? ' · <span class="prep">先擺好，輪到你再按 ✓</span>' : ' · <span class="prep">可以先選方塊、先擺位置</span>') : '');
   $('bkTag').innerHTML = tag + (myTurn&&V.timed?' <span class="tleft"></span>':'');
   $('bkPlace').disabled = !myTurn || !ghost || !C.bk.legal;
   $('bkPlace').classList.toggle('ready', myTurn && !!ghost && C.bk.legal);
-  ['bkRot','bkFlip'].forEach(id=>$(id).disabled = !myTurn || C.bk.piece==null);
+  ['bkRot','bkFlip'].forEach(id=>$(id).disabled = C.bk.piece==null);
   $('bkHint').disabled = !myTurn;
   $('bkSel').innerHTML = C.bk.piece!=null ? pieceSVG(C.bk.shape, BK_COL[me], 12) : '<span>選中的方塊</span>';
 }
@@ -1369,7 +1492,7 @@ function bkCellFromPoint(x, y){
 const DRAG_LIFT = 64;
 let bkDrag=null;
 function bkDragStart(e, fromBoard){
-  const V=C&&C.V; if(!V||V.turn!==V.me||V.over) return;
+  if(!bkCanPrep()) return;
   bkDrag={id:e.pointerId, x0:e.clientX, y0:e.clientY, started:fromBoard, fromBoard};
   if(fromBoard) bkDragBegin(e);
 }
@@ -1400,12 +1523,12 @@ function bkDragEnd(e){
   if(was){ renderBK(); if(C.bk.at && C.bk.legal) Snd.play(); }
 }
 $('bkTray').addEventListener('pointerdown', e=>{
-  const b=e.target.closest('.bkpc'); if(!b||!C||!C.V||C.V.turn!==C.V.me) return;
+  const b=e.target.closest('.bkpc'); if(!b||!bkCanPrep()) return;
   const pc=+b.dataset.pc; if(C.bk.piece!==pc){ bkSelect(pc); renderBK(); }
   bkDragStart(e, false);
 });
 $('bkBoard').addEventListener('pointerdown', e=>{
-  const V=C&&C.V; if(!V||V.turn!==V.me||V.over||C.bk.piece==null) return;
+  const V=C&&C.V; if(!bkCanPrep()||C.bk.piece==null) return;
   const c=e.target.closest('i'); if(!c) return;
   const i=+c.dataset.i, ghost=bkCells();
   if(ghost && ghost.some(([x,y])=>y*V.N+x===i)){ e.preventDefault(); bkDragStart(e, true); }
@@ -1414,13 +1537,13 @@ window.addEventListener('pointermove', bkDragMove, {passive:false});
 window.addEventListener('pointerup', bkDragEnd);
 window.addEventListener('pointercancel', bkDragEnd);
 $('bkTray').addEventListener('click', e=>{
-  const b=e.target.closest('.bkpc'); if(!b||!C||!C.V) return;
+  const b=e.target.closest('.bkpc'); if(!b||!bkCanPrep()) return;
   const pc=+b.dataset.pc; if(C.bk.piece===pc && !C.bk.at) return;
   if(C.bk.piece!==pc){ bkSelect(pc); Snd.tap(); renderBK(); }
 });
 $('bkBoard').addEventListener('click', e=>{
-  const c=e.target.closest('i'); const V=C&&C.V; if(!c||!V||V.turn!==V.me||V.over) return;
-  if(C.bk.piece==null){ toast('先選下面的一塊方塊'); return; }
+  const c=e.target.closest('i'); const V=C&&C.V; if(!c||!bkCanPrep()) return;
+  if(C.bk.piece==null){ if(V.turn===V.me) toast('先選下面的一塊方塊'); return; }
   const i=+c.dataset.i, ghost=bkCells();
   if(ghost && ghost.some(([x,y])=>y*V.N+x===i)) return; // 點在預覽上不移動（避免拖完又被當成點擊）
   C.bk.at=bkSnap([i%V.N, Math.floor(i/V.N)]).at; Snd.tap(); renderBK();
@@ -1433,7 +1556,7 @@ $('bkfFlip').addEventListener('click', ()=>bkTransform(K.flip));
 $('bkfOk').addEventListener('click', bkPlaceNow);
 $('bkfNo').addEventListener('click', ()=>{ C.bk.at=null; Snd.tap(); renderBK(); });
 $('bkHint').addEventListener('click', ()=>{
-  const V=C.V; const m=K.aiChoose(bkLocal(), V.me, 'normal'); if(!m){ toast('沒地方放了'); return; }
+  const V=C.V; const m=K.aiChoose(bkLocal(), V.me, 'hard'); if(!m){ toast('沒地方放了'); return; }
   C.bk.piece=m.piece; C.bk.shape=K.norm(m.cells); const pv=bkPivot(C.bk.shape);
   const mx=Math.min(...m.cells.map(c=>c[0])), my=Math.min(...m.cells.map(c=>c[1]));
   C.bk.at=[pv[0]+mx, pv[1]+my]; Snd.tap(); renderBK(); toast('建議放這裡，按 ✓ 確定');
@@ -1446,6 +1569,39 @@ function rmTile(id, cls=''){
   if(R.isJ(id)) return `<span class="rt j ${cls}" data-id="${id}"><b>鬼</b><i>★</i></span>`;
   return `<span class="rt ${cls}" data-id="${id}" style="--rc:${RM_COL[R.col(id)]}"><b>${R.num(id)}</b><i>●</i></span>`;
 }
+const RM_CN=['紅','藍','橘','黑'];
+// 這一組為什麼不成立（給玩家看的白話）
+function rmWhy(set){
+  if(set.length<3) return `只有 ${set.length} 張，一組至少 3 張`;
+  const t=set.filter(x=>!R.isJ(x)); if(!t.length) return '';
+  const nums=t.map(R.num), cols=t.map(R.col);
+  if(nums.every(n=>n===nums[0])){
+    if(set.length>4) return '同數字最多 4 張（四種顏色各一）';
+    const dup=cols.find((c,i)=>cols.indexOf(c)!==i); if(dup!=null) return `同數字不能有兩張${RM_CN[dup]}色`;
+    return '這組排不起來';
+  }
+  if(cols.every(c=>c===cols[0])){
+    const ns=nums.slice().sort((a,b)=>a-b);
+    const d=ns.find((n,i)=>i&&n===ns[i-1]); if(d!=null) return `同顏色連號不能有兩張 ${d}`;
+    const gaps=ns[ns.length-1]-ns[0]+1-ns.length, jk=set.length-t.length;
+    if(gaps>jk){ const miss=[]; for(let n=ns[0];n<=ns[ns.length-1];n++) if(!ns.includes(n)) miss.push(n); return `同顏色要連號，中間少了 ${miss.slice(0,3).join('、')}`; }
+    if(set.length>13) return '連號最多 13 張';
+    return '連號超出 1～13 的範圍';
+  }
+  return '要「同數字、不同顏色」或「同顏色、連號」，不能混';
+}
+// 為什麼還不能按完成；可以就回傳 null
+function rmBlock(){
+  const V=C.V, me=V.me, st=new Set(C.rm.start), sets=C.rm.table.filter(s=>s.length);
+  const bad=sets.map((s,i)=>[s,i]).filter(([s])=>!R.valid(s));
+  if(!rmAdded().length) return {msg: sets.length && JSON.stringify(sets)!==JSON.stringify(V.table) ? '只移動了桌上的牌，還要從手上出至少一張' : '還沒從手上出牌（不想出就按「摸牌」）'};
+  if(bad.length) return {msg: `紅框的組不成立：${rmWhy(bad[0][0])}` + (bad.length>1?`（共 ${bad.length} 組有問題）`:''), bad:true};
+  if(!V.melded[me]){
+    const v=sets.filter(s=>s.every(x=>!st.has(x))).reduce((a,s)=>{ const z=R.analyze(s); return a+(z?z.value:0); },0);
+    if(v<30) return {msg:`第一次出牌要湊到 30 點，現在 ${v} 點，還差 ${30-v} 點`};
+  }
+  return null;
+}
 function rmReset(){ const V=C.V; C.rm={ver:V.ver, gid:V.gid, table:V.table.map(s=>s.slice()), rack:V.hand.slice(), sel:[], start:V.table.flat()}; }
 function rmSorted(r){ const m=store.get('jk_rmsort','col');
   return r.slice().sort(m==='col' ? (a,b)=>(R.col(a)-R.col(b))||(R.num(a)-R.num(b))||a-b : (a,b)=>(R.num(a)-R.num(b))||(R.col(a)-R.col(b))||a-b); }
@@ -1457,12 +1613,20 @@ function renderRM(){
   $('rmPlayers').innerHTML = V.players.map((p,i)=>`<div class="bkp ${V.turn===i&&!V.over?'turn':''} ${i===me?'me':''}">
     <span class="bkav">${avatar(p.kind)}</span><span class="bkn">${esc(i===me?'我':p.name)}</span>
     <span class="bkc">${V.counts[i]} 張${V.melded[i]?'':' · 未開門'}</span>${V.status[i]&&V.turn!==i?`<em>${esc(V.status[i])}</em>`:''}${seatTail(V,i)}</div>`).join('');
+  $('game').classList.toggle('myturn', myTurn); $('game').classList.toggle('waiting', !myTurn && !V.over);
   const sel=new Set(C.rm.sel), st=new Set(C.rm.start);
-  const sets=C.rm.table;
-  $('rmTable').innerHTML = (sets.length ? sets.map((s,i)=>{ if(!s.length) return ''; const info=R.analyze(s);
-      return `<div class="rset ${info?'':'bad'}" data-set="${i}">${(info?info.order:s).map(id=>rmTile(id,(sel.has(id)?'sel ':'')+(!st.has(id)?'new':''))).join('')}${myTurn?`<button class="radd" data-add="${i}" aria-label="加到這組">＋</button>`:''}</div>`; }).join('')
-    : '') + (myTurn ? `<button class="rnew" id="rmNewSet" ${sel.size?'':'disabled'}>＋ 用選的牌開新組</button>` : '') +
-    (!sets.some(s=>s.length) && !myTurn ? '<p class="rmempty">桌上還沒有牌</p>' : '');
+  const pk = !myTurn ? livePeek() : null;
+  const sets = pk ? pk.p.table : C.rm.table;
+  const nTiles = sets.reduce((a,s)=>a+s.length,0);
+  $('rmTable').classList.toggle('dense', nTiles>36); $('rmTable').classList.toggle('xdense', nTiles>64);
+  $('rmTable').classList.toggle('peeking', !!pk);
+  const dragIds = pk && pk.p.drag ? new Set(pk.p.drag.ids) : null;
+  $('rmTable').innerHTML = (myTurn ? `<button class="rnew rtop" ${sel.size?'':'data-off="1"'}>＋ 開新組（選好牌點這裡，或拖過來）</button>` : '') + (sets.length ? sets.map((s,i)=>{ if(!s.length) return ''; const info=R.analyze(s);
+      return `<div class="rset ${info?'':'bad'}" data-set="${i}" ${!info&&myTurn?`data-why="${esc(rmWhy(s))}"`:''}>${(info?info.order:s).map(id=>rmTile(id,(sel.has(id)?'sel ':'')+(!st.has(id)?'new ':'')+(dragIds&&dragIds.has(id)?'ghost':''))).join('')}${myTurn?`<button class="radd" data-add="${i}" aria-label="加到這組">＋</button>`:''}</div>`; }).join('')
+    : '') + (myTurn && sets.some(s=>s.length) ? `<button class="rnew" ${sel.size?'':'data-off="1"'}>＋ 用選的牌開新組</button>` : '') +
+    (!sets.some(s=>s.length) && !myTurn ? '<p class="rmempty">桌上還沒有牌</p>' : '') +
+    (pk && pk.p.drag ? `<div class="rmpkdrag" style="left:${(pk.p.drag.x*100).toFixed(1)}%;top:${(pk.p.drag.y*100).toFixed(1)}%">${pk.p.drag.ids.map(id=>rmTile(id)).join('')}<span class="pkhand">👆</span></div>` : '');
+  if(myTurn && !rmDrag) peekSend({table:C.rm.table, drag:null});
   $('rmRack').innerHTML = rmSorted(C.rm.rack).map(id=>rmTile(id, sel.has(id)?'sel':'')).join('') || '<span class="note">手上沒牌了</span>';
   const added=rmAdded();
   let info = `牌堆剩 ${V.pool} 張`;
@@ -1472,10 +1636,12 @@ function renderRM(){
     info = `首次出牌：<b class="${v>=30?'up':'down'}">${v}</b> / 30 點 · ` + info;
   }
   $('rmInfo').innerHTML = info;
-  const tag = V.over ? '這局結束' : myTurn ? (added.length ? `已放 ${added.length} 張，按「完成」` : '把牌拖到某一組加進去，或拖到桌上空白處開新組') : `等 ${esc(V.players[V.turn].name)} 出牌…`;
+  const blk = myTurn ? rmBlock() : null;
+  const tag = V.over ? '這局結束' : myTurn ? (added.length ? (blk ? `<span class="rmwhy">⚠ ${esc(blk.msg)}</span>` : `已放 ${added.length} 張，可以按「完成」了！`) : '把牌拖到某一組加進去，或拖到桌上空白處開新組') : pk ? `<b class="pkname">${esc(V.players[V.turn].name)}</b> 正在擺牌…（黃色是新放的）` : `等 ${esc(V.players[V.turn].name)} 出牌…`;
   $('rmTag').innerHTML = tag + (myTurn&&V.timed?' <span class="tleft"></span>':'');
-  const allOk = sets.every(s=>!s.length || R.valid(s));
-  $('rmDone').disabled = !myTurn || !added.length || !allOk;
+  // 「完成」在自己回合都可以按；還不行時按下去會說原因
+  $('rmDone').disabled = !myTurn;
+  $('rmDone').classList.toggle('notyet', myTurn && !!blk);
   $('rmDraw').disabled = !myTurn;
   $('rmUndo').disabled = !myTurn || (!added.length && !sel.size && JSON.stringify(sets)===JSON.stringify(V.table));
   $('rmHint').disabled = !myTurn;
@@ -1510,7 +1676,7 @@ $('rmTable').addEventListener('click', e=>{
   const V=C&&C.V; if(!V||V.turn!==V.me||V.over) return;
   if(C.rm.justDragged && Date.now()-C.rm.justDragged<350) return;
   const add=e.target.closest('[data-add]'); if(add){ rmMoveSel(+add.dataset.add); return; }
-  if(e.target.closest('#rmNewSet')){ rmMoveSel(null); return; }
+  if(e.target.closest('.rnew')){ if(!C.rm.sel.length){ toast('先選手上的牌，或直接把牌拖到這裡'); return; } rmMoveSel(null); return; }
   const t=e.target.closest('.rt'); if(!t) return;
   const id=+t.dataset.id, st=new Set(C.rm.start);
   if(st.has(id) && !V.melded[V.me]){ toast('第一次出牌不能動桌上的牌'); Snd.err(); return; }
@@ -1522,6 +1688,7 @@ $('rmTable').addEventListener('click', e=>{
 let rmDrag=null;
 function rmDropTarget(x, y){
   const el=document.elementFromPoint(x, y); if(!el) return null;
+  const nw=el.closest('.rnew'); if(nw) return {kind:'new', el:nw};
   const set=el.closest('.rset'); if(set) return {kind:'set', i:+set.dataset.set, el:set};
   if(el.closest('#rmRack')) return {kind:'rack', el:$('rmRack')};
   if(el.closest('#rmTable')) return {kind:'new', el:$('rmTable')};
@@ -1550,6 +1717,8 @@ document.addEventListener('pointermove', e=>{
   rmClearDrop(); const tg=rmDropTarget(e.clientX, e.clientY-46);
   if(tg){ tg.el.classList.add('rdrop'); if(tg.kind==='set'){ const z=R.analyze(C.rm.table[tg.i].concat(rmDrag.tiles)); tg.el.classList.toggle('rok', !!z); } }
   rmDrag.target=tg;
+  const tr=$('rmTable').getBoundingClientRect();
+  peekSend({table:C.rm.table.map(s=>s.filter(x=>!rmDrag.tiles.includes(x))).filter(s=>s.length), drag:{ids:rmDrag.tiles, x:(e.clientX-tr.left)/tr.width, y:(e.clientY-46-tr.top)/tr.height}});
 }, {passive:false});
 function rmDragEnd(e){
   if(!rmDrag||e.pointerId!==rmDrag.pid) return;
@@ -1567,11 +1736,16 @@ document.addEventListener('pointercancel', rmDragEnd);
 $('rmUndo').addEventListener('click', ()=>{ rmReset(); Snd.tap(); renderRM(); });
 $('rmSort').addEventListener('click', ()=>{ store.set('jk_rmsort', store.get('jk_rmsort','col')==='col'?'num':'col'); Snd.tap(); renderRM(); });
 $('rmDraw').addEventListener('click', ()=>{ rmReset(); sendAct({k:'draw'}); });
-$('rmDone').addEventListener('click', ()=>{ sendAct({k:'commit', table:C.rm.table.filter(s=>s.length)}); });
+$('rmDone').addEventListener('click', ()=>{
+  const b=rmBlock();
+  if(b){ toast(b.msg, 2600); Snd.err(); try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
+    document.querySelectorAll('#rmTable .rset.bad').forEach(el=>{ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); el.scrollIntoView({block:'nearest', behavior:'smooth'}); });
+    return; }
+  sendAct({k:'commit', table:C.rm.table.filter(s=>s.length)}); });
 $('rmHint').addEventListener('click', ()=>{
   const V=C.V;
   const S={racks:{}, table:V.table.map(s=>s.slice()), melded:V.melded}; S.racks[V.me]=V.hand.slice();
-  const m=R.aiChoose(S, V.me, 'normal');
+  const m=R.aiChoose(S, V.me, 'hard');
   if(m.t==='draw'){ rmReset(); renderRM(); toast(V.melded[V.me]?'沒有牌可以出，建議摸牌':'湊不到 30 點，建議摸牌'); return; }
   const onTable=new Set(m.table.flat());
   C.rm.table=m.table.map(s=>s.slice()); C.rm.rack=V.hand.filter(x=>!onTable.has(x)); C.rm.sel=[];
@@ -1597,6 +1771,7 @@ function soundLabel(){ const t='音效：'+(Snd.on?'開':'關'); $('btnSound1').
 
 function showLobby(L){
   const isHost = C.mode==='host';
+  if(L) C.diff = L.diff;
   $('menu').hidden=true; $('game').hidden=true; $('lobby').hidden=false; $('result').hidden=true;
   document.body.className='';
   $('roomCode').textContent = L ? L.code : '····';
@@ -1660,7 +1835,8 @@ function guestConnect(attempt){
       w.onData(m=>{ if(C!==my||!m) return;
         if(m.t==='lobby') showLobby(m.L);
         else if(m.t==='state') applyView(m.V);
-        else if(m.t==='emo') showEmo(m.by, m.e, true);
+        else if(m.t==='emo') showEmo(m.by, m.e, true, m.fx);
+        else if(m.t==='peek') onPeek(m);
         else if(m.t==='err'){ toast(m.msg); Snd.err(); if(m.fatal){ my.leaving=true; exitToMenu(); } }
         else if(m.t==='closed'){ my.leaving=true; toast('房主關掉房間了'); exitToMenu(); }
       });

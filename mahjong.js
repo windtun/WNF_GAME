@@ -443,6 +443,53 @@
     return hand.slice().reverse().find(i => kind(i) === best);
   }
 
+  /* 困難：算牌（扣掉桌上看得到的牌）＋防守。
+     別人副露多、牌摸到後段時，會避開危險牌；自己離聽牌還遠時乾脆放棄、只打安全牌 */
+  function visibleCounts(S, p) {
+    const v = new Array(34).fill(0);
+    S.hands[p].forEach(i => { if (!isFlower(i)) v[kind(i)]++; });
+    S.discards.forEach(d => v[kind(d.id)]++);
+    S.melds.forEach(ms => ms.forEach(m => { if (m.type !== 'ckong' || ms === S.melds[p]) m.tiles.forEach(i => v[kind(i)]++); }));
+    return v;
+  }
+  const HP = { foldS: 2, foldT: 0.75, w0: 2, w1: 5 };
+  function hardDiscard(S, p) {
+    const hand = S.hands[p], melds = S.melds[p], N = 5 - melds.length, c = counts(hand), vis = visibleCounts(S, p);
+    const wallLeft = S.wall.length - LEFT_END;
+    const threat = [0, 1, 2, 3].map(q => {
+      if (q === p) return 0;
+      let t = 0.15 + 0.25 * S.melds[q].length;
+      if (wallLeft < 40) t += 0.2; if (wallLeft < 20) t += 0.2;
+      return Math.min(1, t);
+    });
+    const safeBy = [0, 1, 2, 3].map(q => new Set(S.discards.filter(d => d.by === q).map(d => kind(d.id))));
+    const tileDanger = (k, q) => {
+      if (safeBy[q].has(k)) return 0;
+      if (isHonor(k)) return vis[k] >= 3 ? 0.05 : vis[k] === 2 ? 0.3 : 0.6;
+      const n = k % 9; return n === 0 || n === 8 ? 0.6 : n === 1 || n === 7 ? 0.8 : 1;
+    };
+    const ks = [...new Set(hand.map(kind))];
+    const opts = ks.map(k => {
+      c[k]--;
+      const sh = shanten(c, N);
+      let uke = 0;
+      for (let x = 0; x < 34; x++) { if (c[x] >= 4) continue; c[x]++; if (shanten(c, N) < sh) uke += Math.max(0, 4 - vis[x] - (x === k ? 0 : 0)); c[x]--; }
+      c[k]++;
+      const danger = [0, 1, 2, 3].reduce((a, q) => a + threat[q] * tileDanger(k, q), 0);
+      // 三元牌、門風圈風的對子留著有台
+      const valuePair = c[k] >= 2 && (k >= 31 || k - 27 === seatWind(S, p) || k - 27 === S.wind) ? 3 : 0;
+      return { k, sh, uke, danger, valuePair };
+    });
+    const minS = Math.min(...opts.map(o => o.sh)), maxThreat = Math.max(...threat);
+    let pick;
+    if (minS >= HP.foldS && maxThreat >= HP.foldT) {
+      pick = opts.sort((a, b) => a.danger - b.danger || a.sh - b.sh)[0];          // 棄胡：只打安全牌
+    } else {
+      const W = minS === 0 ? HP.w0 : HP.w1;
+      pick = opts.filter(o => o.sh === minS).sort((a, b) => (b.uke - b.danger * W - b.valuePair) - (a.uke - a.danger * W - a.valuePair))[0];
+    }
+    return hand.slice().reverse().find(i => kind(i) === pick.k);
+  }
   function aiSelf(S, p, diff) {
     const o = selfOptions(S, p);
     if (o.tsumo) return { t: 'tsumo' };
@@ -452,7 +499,7 @@
       const c = counts(h), s0 = shanten(c, N); c[k] -= 4;
       if (diff === 'easy' || shanten(c, N - 1) <= s0) return { t: 'ankong', kind: k };
     }
-    return { t: 'discard', id: bestDiscard(h, S.melds[p], diff) };
+    return { t: 'discard', id: diff === 'hard' ? hardDiscard(S, p) : bestDiscard(h, S.melds[p], diff) };
   }
 
   function aiClaim(S, q, diff) {
@@ -478,7 +525,7 @@
     return { t: 'claim', c: 'pass' };
   }
 
-  const API = { _score: scoreHand, kind, isFlower, tileName, WIND, FLO, HON, LEFT_END, newMatch, nextHand, selfOptions, act, pending, chowOptions, canWin, waits, shanten, counts, aiSelf, aiClaim, seatWind, bestDiscard };
+  const API = { HP, _score: scoreHand, kind, isFlower, tileName, WIND, FLO, HON, LEFT_END, newMatch, nextHand, selfOptions, act, pending, chowOptions, canWin, waits, shanten, counts, aiSelf, aiClaim, seatWind, bestDiscard };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.MJ = API;
 })(this);

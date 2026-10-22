@@ -8,6 +8,7 @@
 <meta name="application-name" content="牌搭子">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>牌搭子</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Noto+Sans+TC:wght@500;700;900&display=swap">
 <style>
@@ -700,9 +701,221 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 #rmRack.rdrop{background:rgba(255,241,194,.8);border-radius:12px}
 .rset{transition:transform .12s}
 #rmTable .rt{width:30px;height:40px}
+
+/* ---------- 嘴砲特效 ---------- */
+#emoFx{position:fixed;inset:0;z-index:36;pointer-events:none;overflow:hidden}
+.efx{position:absolute;pointer-events:none}
+/* 漫畫對話框 */
+.ebubble{transform:translate(-50%,-50%)}
+.eb{position:relative;display:flex;align-items:center;gap:8px;background:#fff;border:3px solid var(--ink);border-radius:20px;box-shadow:5px 5px 0 var(--ink);padding:8px 16px 8px 8px;white-space:nowrap;animation:ebIn .45s cubic-bezier(.3,1.7,.5,1) both, ebOut .3s ease-in 2.35s forwards}
+.eb:before,.eb:after{content:"";position:absolute;left:calc(50% + var(--tx,0px));width:0;height:0;border:12px solid transparent;transform:translateX(-50%)}
+.eb.up:before{bottom:-27px;border-top:15px solid var(--ink)}
+.eb.up:after{bottom:-19px;border-top:12px solid #fff;border-width:10px}
+.eb.down:before{top:-27px;border-bottom:15px solid var(--ink)}
+.eb.down:after{top:-19px;border-bottom:12px solid #fff;border-width:10px}
+.ebav{width:46px;height:46px;border-radius:50%;border:2.5px solid var(--ink);background:linear-gradient(160deg,#fff,#DDE6FF);display:grid;place-items:center;flex:none}
+.ebav svg{width:42px;height:42px}
+.ebt{display:flex;flex-direction:column;line-height:1.1}
+.ebt small{font-size:12px;font-weight:900;color:var(--ink-soft)}
+.ebt b{font-size:28px;font-weight:900;font-style:italic;color:var(--ink);animation:ebWig .5s ease-in-out .45s 2}
+@keyframes ebIn{0%{transform:scale(.2) rotate(-12deg);opacity:0}100%{transform:none;opacity:1}}
+@keyframes ebOut{to{transform:scale(.6) translateY(-20px);opacity:0}}
+@keyframes ebWig{25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+/* 彈幕 */
+.edan{left:100%;white-space:nowrap;font-weight:900;-webkit-text-stroke:1.5px var(--ink);paint-order:stroke fill;text-shadow:2px 2px 0 var(--ink);animation:dan 2.6s linear forwards}
+.edan i{font-style:normal;font-size:.6em}
+@keyframes dan{to{transform:translateX(calc(-100vw - 100%))}}
+/* 愛心 */
+.ehtxt{transform:translate(-50%,-50%);font-size:28px;font-weight:900;color:#fff;-webkit-text-stroke:2px #C42A64;paint-order:stroke fill;text-shadow:0 0 12px #FF7FA0;white-space:nowrap;animation:ebIn .4s cubic-bezier(.3,1.7,.5,1) both, ebOut .3s ease-in 2.4s forwards}
+.eheart{animation:heart 2s ease-out both;text-shadow:0 0 0 #fff}
+@keyframes heart{0%{transform:translate(0,0) scale(.3);opacity:0}15%{opacity:1}100%{transform:translate(var(--dx),-220px) scale(1.1) rotate(15deg);opacity:0}}
+/* 動漫登場 */
+.ecut{left:0;right:0;top:34%;height:120px}
+.ecband{position:absolute;inset:0;display:flex;align-items:center;gap:14px;padding-left:20px;background:repeating-linear-gradient(115deg,#1B1B3A 0 18px,#2A2A55 18px 36px);border-block:4px solid #FFD23F;transform:skewY(-6deg);box-shadow:0 8px 0 rgba(27,27,58,.4);animation:cutIn .35s cubic-bezier(.2,1,.4,1) both, cutOut .3s ease-in 2.2s forwards;overflow:hidden}
+.ecband:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 30px,rgba(255,255,255,.18) 30px 32px);animation:speedx .3s linear infinite}
+.ecav{position:relative;z-index:1;width:104px;height:104px;border-radius:50%;background:linear-gradient(160deg,#fff,#FFE1EC);border:4px solid #FFD23F;display:grid;place-items:center;transform:skewY(6deg);animation:cutAv .5s cubic-bezier(.2,1.4,.4,1) .1s both}
+.ecav svg{width:96px;height:96px}
+.ectx{position:relative;z-index:1;display:flex;flex-direction:column;transform:skewY(6deg)}
+.ectx small{color:#FFD23F;font-weight:900;font-size:14px;letter-spacing:.1em}
+.ectx b{color:#fff;font-size:34px;font-weight:900;font-style:italic;-webkit-text-stroke:2px #FF4F8B;paint-order:stroke fill;text-shadow:3px 3px 0 #FF4F8B;white-space:nowrap}
+@keyframes cutIn{from{transform:skewY(-6deg) translateX(-110%)}}
+@keyframes cutOut{to{transform:skewY(-6deg) translateX(110%)}}
+@keyframes cutAv{from{transform:skewY(6deg) translateX(-160px) scale(.6)}}
+@keyframes speedx{to{background-position:32px 0}}
+/* 霓虹燈 */
+.eneon{left:0;right:0;top:36%;padding:16px 0;text-align:center;background:rgba(10,8,30,.82);border-block:2px solid #2EC5FF;display:flex;flex-direction:column;align-items:center;animation:neonBox 2.9s ease forwards}
+.eneon small{color:#2EC5FF;font-weight:900;text-shadow:0 0 8px #2EC5FF}
+.eneon b{font-size:40px;font-weight:900;color:#FFE6F1;text-shadow:0 0 6px #FF4F8B,0 0 14px #FF4F8B,0 0 28px #FF4F8B,0 0 42px #FF2E7A;animation:flick 1.2s steps(1) 2}
+@keyframes flick{0%,18%,22%,60%,64%,100%{opacity:1}20%,62%{opacity:.25}}
+@keyframes neonBox{0%{opacity:0}8%{opacity:1}88%{opacity:1}100%{opacity:0}}
+/* 黃金 */
+.egold{left:0;right:0;top:34%;text-align:center;display:flex;flex-direction:column;align-items:center;animation:ebIn .5s cubic-bezier(.3,1.7,.5,1) both, ebOut .4s ease-in 2.8s forwards}
+.egold small{font-weight:900;color:#7A5300;background:#FFE58A;border:2px solid var(--ink);border-radius:99px;padding:1px 10px}
+.egold b{font-size:46px;font-weight:900;font-style:italic;background:linear-gradient(180deg,#FFF6C2 0%,#FFD23F 45%,#D99A00 55%,#FFE58A 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:2px #7A4A00;filter:drop-shadow(3px 4px 0 #1B1B3A);animation:shine 1.2s linear infinite}
+@keyframes shine{50%{filter:drop-shadow(3px 4px 0 #1B1B3A) brightness(1.25)}}
+.ecoin{top:-30px;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFF1B8 0 18%,#FFD23F 19% 62%,#D9A100 63%);box-shadow:inset 0 0 0 1.5px #D9A100;animation:coinfall 2s ease-in both}
+@keyframes coinfall{to{transform:translateY(calc(100vh + 60px)) rotate(var(--r))}}
+#fx .boom .bw{display:block;font-size:16px;-webkit-text-stroke:0;text-shadow:none;color:var(--ink);font-style:normal;letter-spacing:.1em}
+/* 商店預覽 */
+.spv.fxpv{border-radius:12px;border:2px solid var(--ink);display:grid;place-items:center;font-size:12px;font-weight:900;padding:4px;text-align:center}
+.fx-bubble{background:#fff}
+.fx-danmaku{background:repeating-linear-gradient(0deg,#1B1B3A 0 14px,#26264d 14px 28px);color:#FFD23F}
+.fx-hearts{background:linear-gradient(160deg,#FFE1EC,#FFB3C7);color:#C42A64}
+.fx-boom{background:#FFD23F}
+.fx-cutin{background:repeating-linear-gradient(115deg,#1B1B3A 0 10px,#2A2A55 10px 20px);color:#fff;border-color:#FFD23F}
+.fx-neon{background:#0E0B24;color:#FFE6F1;text-shadow:0 0 6px #FF4F8B,0 0 12px #FF4F8B}
+.fx-gold{background:linear-gradient(160deg,#FFF6C2,#FFD23F);color:#7A4A00}
+.sitem .try{font-size:12px;padding:5px 6px}
+
+/* ===== 拉密牌縮小（牌多時再縮） ===== */
+.rt{width:24px;height:33px;border-radius:5px}
+.rt b{font-size:14.5px}
+.rt i{font-size:5.5px;margin-top:1px}
+.rt.j b{font-size:12px}
+#rmTable .rt{width:24px;height:33px}
+#rmTable.dense .rt{width:21px;height:29px}
+#rmTable.dense .rt b{font-size:13px}
+#rmTable.xdense .rt{width:19px;height:26px}
+#rmTable.xdense .rt b{font-size:11.5px}
+#rmTable.xdense .rt i{display:none}
+#rmTable.dense,#rmTable.xdense{gap:5px;padding:6px}
+.rset{gap:1px;padding:2px;border-radius:8px}
+#rmRack{gap:3px}
+#rmRack .rt{width:28px;height:39px}
+#rmRack .rt b{font-size:17px}
+#rmDragEl .rt{width:30px;height:41px}
+#rmDragEl .rt b{font-size:18px}
+/* ===== 即時看到別人在動 ===== */
+#rmTable{position:relative}
+#rmTable.peeking{box-shadow:inset 0 0 0 3px rgba(255,255,255,.75),4px 4px 0 var(--ink)}
+.rmpkdrag{position:absolute;z-index:5;display:flex;gap:1px;transform:translate(-12px,-50%) rotate(-5deg);filter:drop-shadow(3px 5px 0 rgba(27,27,58,.35));transition:left .12s linear,top .12s linear;pointer-events:none}
+.rmpkdrag .pkhand{position:absolute;right:-16px;bottom:-14px;font-size:20px;transform:rotate(5deg)}
+.pkname{background:var(--ink);color:#fff;border-radius:99px;padding:0 7px;font-weight:900}
+.bktag .pkname{background:var(--pc,var(--ink))}
+#bkBoard i.pk{background:var(--pk)!important;opacity:.62;box-shadow:inset 0 0 0 2px #fff,0 0 0 1px var(--ink);animation:pkpulse .7s ease-in-out infinite alternate;z-index:2}
+#bkBoard i.pk.over{opacity:.85;box-shadow:inset 0 0 0 3px #fff}
+@keyframes pkpulse{to{opacity:.9;transform:translateY(-2px)}}
+#bkBoard i.gh.pre{background:var(--me)!important;opacity:.45;box-shadow:inset 0 0 0 2px #fff;z-index:2}
+.prep{color:var(--pink-deep);white-space:nowrap}
+/* ===== 輪到自己：明顯提示 ===== */
+#game.myturn #bkBoard,#game.myturn #rmTable{animation:myglow 1.1s ease-in-out infinite}
+@keyframes myglow{0%,100%{box-shadow:0 0 0 3px var(--sun),0 0 10px 3px rgba(255,190,0,.55),4px 4px 0 var(--ink)}50%{box-shadow:0 0 0 5px var(--sun),0 0 22px 9px rgba(255,190,0,.85),4px 4px 0 var(--ink)}}
+#game.myturn .bktag,#game.myturn #rmTag{background:var(--sun);border:2px solid var(--ink);border-radius:99px;padding:2px 10px;box-shadow:2px 2px 0 var(--ink);animation:pulse 1.2s ease-in-out infinite;display:inline-block}
+#game.myturn .bktag{justify-self:center;align-self:center;margin-inline:auto}
+#game.waiting #bkPlace,#game.waiting #rmDone,#game.waiting #rmDraw,#game.waiting #rmHint,#game.waiting #bkHint{filter:grayscale(.7);opacity:.55}
+.bkp.turn{animation:pulse 1.2s ease-in-out infinite}
+.turnban{position:absolute;left:0;right:0;top:38%;display:flex;justify-content:center;pointer-events:none;animation:tbIn .25s cubic-bezier(.3,1.5,.5,1) both,tbOut .3s ease-in 1.15s forwards}
+.turnban b{font:900 clamp(34px,10vw,58px)/1.1 var(--f-cute);color:#fff;letter-spacing:.06em;padding:8px 26px;background:repeating-linear-gradient(-45deg,#FF4F8B 0 14px,#FF6FA0 14px 28px);border:4px solid var(--ink);border-radius:18px;box-shadow:6px 6px 0 var(--ink);-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;transform:rotate(-4deg)}
+@keyframes tbIn{from{transform:scale(2.4);opacity:0}}
+@keyframes tbOut{to{transform:translateY(-40px) scale(.8);opacity:0}}
+/* ===== 橫式（手機轉橫） ===== */
+@media (orientation:landscape) and (max-height:560px){
+  .bar{padding-block:3px 2px}
+  .bar .candy{font-size:12px;padding:4px 10px}
+  .bar .ttl{font-size:14px}
+  /* 大老二、排七：左邊牌桌＋手牌，右邊按鈕直排 */
+  .g-big2 #game,.g-seven #game{display:grid;grid-template-columns:minmax(0,1fr) 116px;grid-template-rows:auto minmax(0,1fr) auto auto;column-gap:10px}
+  .g-big2 #game>.bar,.g-seven #game>.bar{grid-column:1/-1}
+  .g-big2 #table,.g-seven #table{grid-column:1;grid-row:2}
+  .g-big2 #me,.g-seven #me{grid-column:1;grid-row:3/5;padding-block:2px 4px;gap:3px}
+  .g-big2 #emoBar,.g-seven #emoBar{grid-column:2;grid-row:2;flex-direction:column;overflow-y:auto;overflow-x:hidden;align-self:start;max-height:100%}
+  .g-big2 .actions,.g-seven .actions{grid-column:2;grid-row:3/5;grid-template-columns:1fr;gap:6px;padding-block:2px 8px;align-content:end}
+  .g-big2 .actions .candy,.g-seven .actions .candy{padding:8px 4px;font-size:14px}
+  .table{grid-template-columns:70px 1fr 70px}
+  .av{width:38px;height:38px}.av svg{width:32px;height:32px}
+  /* Blokus：左邊棋盤，右邊玩家／方塊／按鈕 */
+  .g-bk #game{overflow:hidden}
+  #bk{display:none;flex-direction:row;gap:10px}
+  .g-bk #bk{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-areas:"board ps" "board tag" "board row" "board acts";column-gap:12px;row-gap:5px;min-height:0;padding-block:0 6px}
+  #bkPlayers{grid-area:ps;flex-wrap:wrap}
+  .bkp{flex:1 1 40%;padding:2px 6px 2px 3px}
+  .bkwrap{grid-area:board;align-items:center;min-height:0}
+  .bkstage,#bkBoard{width:min(calc(100dvh - 58px),52vw)}
+  .bktag{grid-area:tag;font-size:12px}
+  .bkrow{grid-area:row;min-height:0;align-items:stretch}
+  #bkSel{height:auto;min-height:60px;width:58px}
+  #bkTray{display:flex;flex-wrap:wrap;align-content:flex-start;overflow-y:auto;overflow-x:hidden;touch-action:pan-y}
+  .bkpc{touch-action:pan-y;min-width:38px;min-height:36px}
+  .bkacts{grid-area:acts;gap:5px}
+  .bkacts .candy,.rmacts .candy{font-size:13px;padding:7px 2px}
+  /* 拉密：上面桌面，下面手牌，按鈕放右邊 */
+  .g-rm #game{overflow:hidden}
+  .g-rm #rm{display:grid;grid-template-columns:minmax(0,1fr) 92px;grid-template-rows:auto minmax(0,1fr) auto auto;grid-template-areas:"ps ps" "tbl acts" "info acts" "rack acts";column-gap:8px;row-gap:4px;padding-block:0 6px}
+  #rmPlayers{grid-area:ps}
+  #rmTable{grid-area:tbl;min-height:0;padding:5px;gap:5px}
+  .rminfo{grid-area:info;font-size:11px}
+  #rmRack{grid-area:rack;padding-top:2px;min-height:0;max-height:92px;overflow-y:auto;justify-content:flex-start}
+  .rmacts{grid-area:acts;grid-template-columns:1fr;align-content:end;gap:5px}
+  #rmPlayers .bkp{grid-template-columns:22px minmax(0,1fr);font-size:11px}
+  #rmPlayers .bkav,#bkPlayers .bkav{transform:scale(.85)}
+  .turnban{top:30%}
+}
+
+.rnew.rtop{position:sticky;top:-6px;z-index:4;width:100%;flex:none;background:rgba(255,255,255,.93);padding:6px 10px;font-size:12.5px;box-shadow:0 3px 0 rgba(27,27,58,.25)}
+.rnew[data-off]{color:var(--ink-soft)}
+.rnew.rdrop{background:#D6FFE4;border-color:#2BB673;border-style:solid;color:#137A45;transform:scale(1.02)}
+#rmTable.dense .rnew.rtop,#rmTable.xdense .rnew.rtop{top:-5px}
+@media (orientation:landscape) and (max-height:560px){
+  .table.seven .seat{flex-direction:row!important;gap:5px}
+  .table.seven .seat .av{width:32px;height:32px}
+  .table.seven #center{margin:2px 0;padding:5px 6px}
+  .g-seven #board{max-width:min(380px,100%);gap:2px}
+  .g-seven .cell{font-size:11px}
+  .g-seven .brow .bs{font-size:13px}
+  .g-big2 #me .meinfo,.g-seven #me .meinfo{min-height:0}
+  .rnew.rtop{padding:4px 8px;font-size:12px}
+}
+
+.rset.bad{position:relative;margin-top:14px}
+.rset.bad[data-why]:before{content:attr(data-why);position:absolute;left:-2px;bottom:100%;margin-bottom:2px;white-space:nowrap;font-size:10.5px;font-weight:900;color:#fff;background:var(--red);border-radius:6px;padding:1px 6px;max-width:80vw;overflow:hidden;text-overflow:ellipsis}
+.rset.shake{animation:shake .45s}
+.rmwhy{color:var(--red);font-weight:900}
+#game.myturn #rmTag:has(.rmwhy){background:#FFE1E4}
+#rmDone.notyet{background:#E9E4F2;color:var(--ink-soft)}
+
+@media (orientation:landscape) and (max-height:560px){
+  .table .seat{flex-direction:row;gap:4px;align-items:center}
+  .table .seat .av{width:32px;height:32px}.table .seat .av svg{width:27px;height:27px}
+  .table{grid-template-columns:auto 1fr auto;gap:2px 6px}
+  #tableCards{min-height:52px}
+  .g-big2 #me .meinfo,.g-seven #me .meinfo{font-size:12px}
+  .g-mj #mj{display:grid;grid-template-columns:clamp(150px,24vw,210px) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto;grid-template-areas:"opps info" "opps river" "me ting" "bot bot";column-gap:8px;row-gap:3px;min-height:calc(100dvh - 40px)}
+  #mjInfo{grid-area:info}
+  #mjOpps{grid-area:opps;grid-template-columns:1fr;align-content:start;gap:4px;overflow-y:auto}
+  #mjRiver{grid-area:river;min-height:64px}
+  #mjMeRow{grid-area:me}
+  #mjTing{grid-area:ting;min-height:0}
+  #mjBottom{grid-area:bot;gap:3px}
+  #mjHand{padding-top:4px;gap:4px}
+  #mjActs{min-height:36px}
+  #mjActs .candy{padding:6px;font-size:14px}
+  #mjLast{min-height:34px;font-size:12px}
+}
+@media (orientation:landscape) and (max-height:400px){
+  .g-seven #board{max-width:min(100%,calc((100dvh - 215px) * 2.9))}
+  .g-seven .cell{aspect-ratio:5/6;font-size:10px}
+  .g-seven #q7{--cw:34px;--ch:48px}
+  #rmRack{max-height:76px}
+}
+@media (max-height:600px) and (orientation:portrait){
+  .g-seven #q7{--cw:36px;--ch:50px}
+}
+
+@media (orientation:landscape) and (max-height:560px){
+  .g-big2 #me,.g-seven #me{flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:8px}
+  .g-big2 #me>.meinfo,.g-seven #me>.meinfo{flex:none}
+  .g-big2 #me>#quick,.g-seven #me>#q7,.g-seven #me>#myCov{flex:1 1 0;min-width:0}
+  .g-big2 #me>#hand,.g-seven #me>#hand{flex:1 0 100%}
+  .table .seat.left,.table .seat.right{align-self:start;margin-top:6px}
+  .g-seven #q7{flex-wrap:nowrap;overflow-x:auto}
+}
+
+@media (orientation:landscape) and (max-height:560px){
+  .g-seven #center{position:relative;padding-top:6px}
+  .g-seven #tableLabel{position:absolute;top:3px;right:10px;z-index:2;font-size:12px}
+  .g-seven #board{max-width:min(100%,calc((100dvh - 205px) * 2.2))}
+}
 </style>
-</head>
-<body>
 
 <div id="app">
   <section id="menu" class="screen">
@@ -773,6 +986,7 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
         <div class="chips" id="dChips">
           <button class="chip" data-d="easy" aria-pressed="false">簡單</button>
           <button class="chip" data-d="normal" aria-pressed="true">普通</button>
+          <button class="chip" data-d="hard" aria-pressed="false">困難</button>
         </div>
       </div>
       <button class="candy" id="btnStart">單機練習（跟電腦打）</button>
@@ -814,7 +1028,7 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
       <div class="field"><span class="lbl">幾個人（不夠的由電腦補）</span>
         <div class="chips" id="lnChips"><button class="chip" data-n="2">2 人</button><button class="chip" data-n="3">3 人</button><button class="chip" data-n="4">4 人</button></div></div>
       <div class="field"><span class="lbl">電腦難度</span>
-        <div class="chips" id="ldChips"><button class="chip" data-d="easy">簡單</button><button class="chip" data-d="normal">普通</button></div></div>
+        <div class="chips" id="ldChips"><button class="chip" data-d="easy">簡單</button><button class="chip" data-d="normal">普通</button><button class="chip" data-d="hard">困難</button></div></div>
       <button class="candy" id="btnGo">開始遊戲</button>
       <p class="note" id="lobbyNote"></p>
     </div>
@@ -1021,7 +1235,7 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 <div class="overlay" id="ovShop" hidden>
   <div class="result sheet">
     <div class="shophead"><h2>商店</h2><span class="pfcoins" id="shopCoins"></span></div>
-    <div class="chips center" id="shopTabs"><button class="chip" data-t="avatar">頭像</button><button class="chip" data-t="table">牌桌</button><button class="chip" data-t="emo">嘴砲</button></div>
+    <div class="chips center" id="shopTabs"><button class="chip" data-t="avatar">頭像</button><button class="chip" data-t="table">牌桌</button><button class="chip" data-t="emo">嘴砲</button><button class="chip" data-t="fx">特效</button></div>
     <div class="sgrid" id="shopGrid"></div>
     <p class="note">金幣怎麼來：贏牌、連勝（最多 ×3）、跟朋友連線（×1.5）、麻將胡牌、每日簽到和任務。</p>
     <button class="candy" data-close>關閉</button>
@@ -1030,18 +1244,18 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 
 <div id="bkDragEl" hidden></div>
 <div id="rmDragEl" hidden></div>
-<div id="emoBanner" aria-live="polite"></div>
+<div id="emoFx" aria-live="polite"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="fx"></div>
 
-<script src="peerjs.min.js?v=202610222244"></script>
-<script src="engine.js?v=202610222244"></script>
-<script src="seven.js?v=202610222244"></script>
-<script src="mahjong.js?v=202610222244"></script>
-<script src="blokus.js?v=202610222244"></script>
-<script src="rummi.js?v=202610222244"></script>
-<script src="progress.js?v=202610222244"></script>
-<script src="app.js?v=202610222244"></script>
+<script src="peerjs.min.js?v=202610222355"></script>
+<script src="engine.js?v=202610222355"></script>
+<script src="seven.js?v=202610222355"></script>
+<script src="mahjong.js?v=202610222355"></script>
+<script src="blokus.js?v=202610222355"></script>
+<script src="rummi.js?v=202610222355"></script>
+<script src="progress.js?v=202610222355"></script>
+<script src="app.js?v=202610222355"></script>
 
 </body>
 </html>

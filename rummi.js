@@ -147,7 +147,78 @@
     rec(0, [], 0);
     return best.sets;
   }
+  /* 困難：把「桌上全部的牌＋自己手牌」重新拆組。桌上每一張都要用到，
+     在這個前提下讓手上的牌出得越多越好（真人高手最常用的招） */
+  function rearrange(table, rack, limit) {
+    const JK = 52, kindOf = id => (isJ(id) ? JK : col(id) * 13 + num(id) - 1);
+    const need = new Array(53).fill(0), have = new Array(53).fill(0);
+    table.flat().forEach(id => need[kindOf(id)]++);
+    rack.forEach(id => have[kindOf(id)]++);
+    let nodes = 0, best = null;
+    const chosen = [];
+    const avail = k => need[k] + have[k];
+    const take = ks => { const src = []; ks.forEach(k => { if (need[k] > 0) { need[k]--; src.push(0); } else { have[k]--; src.push(1); } }); return src; };
+    const give = (ks, src) => ks.forEach((k, i) => (src[i] ? have[k]++ : need[k]++));
+    const usedFromRack = () => chosen.reduce((a, c) => a + c.src.reduce((x, y) => x + y, 0), 0);
+    function setsWith(t) {
+      const out = [];
+      if (t === JK) return out;
+      const c = Math.floor(t / 13), n = t % 13;
+      // 組：同數字不同色
+      const others = [0, 1, 2, 3].filter(x => x !== c);
+      for (let mask = 0; mask < 8; mask++) {
+        const ks = [t]; others.forEach((x, i) => { if (mask & (1 << i)) ks.push(x * 13 + n); });
+        if (ks.slice(1).some(k => avail(k) < 1)) continue;
+        for (let j = 0; j <= 2; j++) { if (ks.length + j < 3 || ks.length + j > 4) continue; if (j > avail(JK)) continue; out.push(ks.concat(new Array(j).fill(JK))); }
+      }
+      // 順：同色連號，包含 t
+      for (let a = Math.max(0, n - 6); a <= n; a++) for (let b = Math.max(n, a + 2); b <= Math.min(12, a + 6); b++) {
+        const ks = []; let miss = 0, okk = true;
+        for (let v = a; v <= b; v++) { const k = c * 13 + v; if (v === n || avail(k) > 0) ks.push(k); else { miss++; ks.push(JK); } }
+        if (miss > avail(JK)) okk = false;
+        if (okk) out.push(ks);
+      }
+      return out;
+    }
+    function rec() {
+      if (++nodes > limit) return;
+      let t = -1;
+      for (let k = 0; k < 52; k++) if (need[k] > 0) { t = k; break; }
+      if (t === -1) {
+        if (need[JK] > 0) return; // 桌上的鬼牌也要放進某組（簡化：交給上一層）
+        const sc = usedFromRack();
+        if (!best || sc > best.sc) best = { sc, sets: chosen.map(c => c.ks.slice()) };
+        return;
+      }
+      for (const ks of setsWith(t)) {
+        if (ks.filter(k => k === JK).length > avail(JK)) continue;
+        const src = take(ks); chosen.push({ ks, src });
+        rec();
+        chosen.pop(); give(ks, src);
+        if (nodes > limit) return;
+      }
+    }
+    rec();
+    if (!best) return null;
+    // 把種類換回實際的牌
+    const poolT = table.flat().slice(), poolR = rack.slice();
+    const pick = k => { let i = poolT.findIndex(id => kindOf(id) === k); if (i >= 0) return poolT.splice(i, 1)[0]; i = poolR.findIndex(id => kindOf(id) === k); return i >= 0 ? poolR.splice(i, 1)[0] : null; };
+    const sets = best.sets.map(ks => ks.map(pick));
+    if (sets.some(s => s.includes(null) || !valid(s)) || poolT.length) return null;
+    // 剩下的手牌再自己組新組
+    const extra = bestSets(poolR, false);
+    extra.forEach(s => { sets.push(s.slice()); s.forEach(x => poolR.splice(poolR.indexOf(x), 1)); });
+    return { table: sets.map(s => analyze(s).order), used: rack.length - poolR.length };
+  }
   function aiChoose(S, p, diff) {
+    if (diff === 'hard' && S.melded[p]) {
+      const base = aiChoose(S, p, 'normal');
+      const baseUsed = base.t === 'commit' ? base.table.flat().length - S.table.flat().length : 0;
+      const r = rearrange(S.table, S.racks[p], 20000);
+      if (r && r.used > baseUsed) return { t: 'commit', table: r.table };
+      return base;
+    }
+    if (diff === 'hard') diff = 'normal';
     const rack = S.racks[p];
     let table = S.table.map(s => s.slice());
     let played = new Set();
@@ -213,7 +284,7 @@
     return { t: 'commit', table };
   }
 
-  const API = { JOKER_PTS, MELD_MIN, isJ, col, num, pts, analyze, valid, newGame, commit, draw, rackPts, aiChoose, bestSets };
+  const API = { rearrange, JOKER_PTS, MELD_MIN, isJ, col, num, pts, analyze, valid, newGame, commit, draw, rackPts, aiChoose, bestSets };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.Rummi = API;
 })(this);

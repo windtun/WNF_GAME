@@ -92,7 +92,49 @@
         蓋掉一張 6，其他人手上的 5、4、3… 就永遠接不上，只能一起蓋。 */
   function beyond(v, dir) { const out = []; if (dir < 0) for (let x = v - 1; x >= 1; x--) out.push(x); else for (let x = v + 1; x <= 13; x++) out.push(x); return out; }
   const W = { my: 3, myPts: 0.15, next: 3, opp: 0.6, oppPts: 0.08, dead: 2, seven: 4, block: 1 };
+  /* 困難：蒙地卡羅模擬。只用自己看得到的資訊（自己的手牌、桌面、自己蓋的牌、別人剩幾張），
+     把看不到的牌隨機分給對手很多次，每個候選出法都模擬打完整局，選平均名次最好、蓋牌點數最少的 */
+  function aiHard(S, pi, rolls) {
+    const hand = S.hands[pi], ps = playable(S, pi);
+    let cands;
+    if (ps.length) cands = ps.map(id => ({ play: id }));
+    else {
+      // 蓋牌候選：先用普通版的算法挑出最好的幾張
+      cands = hand.slice().sort((a, b) => pts(a) - pts(b)).slice(0, 4).map(id => ({ cover: id }));
+      const nc = aiChoose(S, pi, 'normal').cover; if (!cands.some(c => c.cover === nc)) cands.push({ cover: nc });
+    }
+    if (cands.length === 1) return cands[0];
+    const known = new Set(hand.concat(S.covered[pi]));
+    for (let s = 0; s < 4; s++) { const b = S.board[s]; if (b) for (let v = b.lo; v <= b.hi; v++) known.add(idOf(s, v)); }
+    const unknown = []; for (let id = 0; id < 52; id++) if (!known.has(id)) unknown.push(id);
+    const R = rolls || 40;
+    // 每個候選用同一批隨機發牌來比（共同隨機數），比較才公平、雜訊小
+    const deals = Array.from({ length: R }, () => shuffle(unknown.slice()));
+    let best = null, bv = Infinity;
+    for (const c of cands) {
+      let tot = 0;
+      for (let r = 0; r < R; r++) {
+        const pool = deals[r].slice();
+        const T = { n: S.n, hands: [], covered: [], board: S.board.map(b => (b ? { lo: b.lo, hi: b.hi } : null)), turn: pi, over: false, ver: 0, last: null, status: new Array(S.n).fill(null), order: [] };
+        for (let q = 0; q < S.n; q++) {
+          if (q === pi) { T.hands.push(hand.slice()); T.covered.push(S.covered[pi].slice()); continue; }
+          T.hands.push(pool.splice(0, S.hands[q].length)); T.covered.push(pool.splice(0, S.covered[q].length));
+        }
+        if (c.play != null) play(T, pi, c.play); else cover(T, pi, c.cover);
+        let guard = 0;
+        while (!T.over && guard++ < 200) { const q = T.turn, m = aiChoose(T, q, 'normal'); if (m.play != null) play(T, q, m.play); else cover(T, q, m.cover); }
+        const others = T.score.reduce((a2, v, q) => a2 + (q === pi ? 0 : v), 0) / Math.max(1, S.n - 1);
+        tot += HARD_OBJ === 'rank' ? T.order.indexOf(pi) * 100 + T.score[pi] : HARD_OBJ === 'pts' ? T.score[pi] : T.score[pi] - others;
+      }
+      const v = tot / R;
+      if (v < bv) { bv = v; best = c; }
+    }
+    return best;
+  }
+  let HARD_OBJ = 'rel';
+  const idOf = (s, v) => (v <= 2 ? (v === 1 ? 11 : 12) : v - 3) * 4 + s;
   function aiChoose(S, pi, diff, w) {
+    if (diff === 'hard') return aiHard(S, pi);
     w = w || W;
     const hand = S.hands[pi], ps = playable(S, pi);
     if (diff === 'easy') {
@@ -172,7 +214,7 @@
   }
 
 
-  const API = { W, nat, pts, newGame, canPlay, playable, play, cover, aiChoose, aiOld };
+  const API = { setObj: o => { HARD_OBJ = o; }, W, nat, pts, newGame, canPlay, playable, play, cover, aiChoose, aiOld };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.Seven = API;
 })(this);

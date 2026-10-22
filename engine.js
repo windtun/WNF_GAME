@@ -215,7 +215,64 @@
     c.size === 5 ? 60 + c.cat * 14 + (c.type === 'flush' ? c.key[0] / 4 : c.key[0]) : c.type === 'triple' ? c.key[0] * 4 : c.key[0];
 
   // 電腦出牌。easy：能壓就出最小的；normal：會留 2 和炸彈、少拆對子，有人快沒牌時改打大的
+  /* 困難：先把整手牌規劃成「最少手數」的組合（五張牌型、對子、單張），
+     出牌盡量照規劃走，不亂拆牌；最後幾手才用大牌搶回出牌權 */
+  function planHand(hand) {
+    const fives = genCombos(hand).filter(c => c.size === 5).sort((a, b) => baseStrength(a) - baseStrength(b));
+    let best = null;
+    const rest = (h) => {
+      const byR = {}; h.forEach(i => (byR[rk(i)] = byR[rk(i)] || []).push(i));
+      const out = [];
+      Object.values(byR).forEach(g => { g.sort((a, b) => a - b);
+        if (g.length >= 2) { out.push(analyze(g.slice(-2))); if (g.length === 3) out.push(analyze([g[0]])); if (g.length === 4) out.push(analyze(g.slice(0, 2))); }
+        else out.push(analyze(g)); });
+      return out;
+    };
+    const score = combos => combos.length * 10 + combos.filter(c => c.size === 1 && c.key[0] < 32).length * 2;
+    let nodes = 0;
+    const rec = (start, used, chosen) => {
+      if (++nodes > 400) return;
+      const left = hand.filter(i => !used.has(i));
+      const combos = chosen.concat(rest(left));
+      const sc = score(combos);
+      if (!best || sc < best.sc) best = { sc, combos };
+      if (chosen.length >= 3) return;
+      for (let k = start; k < fives.length; k++) {
+        const f = fives[k]; if (f.cards.some(i => used.has(i))) continue;
+        f.cards.forEach(i => used.add(i)); chosen.push(f); rec(k + 1, used, chosen); chosen.pop(); f.cards.forEach(i => used.delete(i));
+      }
+    };
+    rec(0, new Set(), []);
+    return best.combos;
+  }
+  const isControl = c => c.bomb || c.cards.some(i => rk(i) === 12) || (c.size === 1 && c.key[0] >= 44);
+  function aiHard(S, pi) {
+    const hand = S.hands[pi], cs = legal(S, pi);
+    if (!cs.length) return null;
+    const fin = cs.find(c => c.size === hand.length); if (fin) return fin.cards;
+    const plan = planHand(hand), key = c => [...c.cards].sort((a, b) => a - b).join();
+    const planKeys = new Set(plan.map(key));
+    const opp = active(S).filter(i => i !== pi), oppMin = Math.min(...opp.map(i => S.hands[i].length));
+    const inPlan = cs.filter(c => planKeys.has(key(c))).sort((a, b) => baseStrength(a) - baseStrength(b));
+    if (!S.table) {
+      // 剩兩手且其中一手是大牌：先出大牌搶回來，再出另一手
+      if (plan.length === 2) { const ctl = plan.find(isControl); if (ctl && inPlan.some(c => key(c) === key(ctl))) return ctl.cards; }
+      let pool = inPlan.filter(c => !isControl(c));
+      if (!pool.length) pool = inPlan;
+      if (oppMin === 1) { const multi = pool.filter(c => c.size > 1); if (multi.length) pool = multi; else return pool[pool.length - 1].cards; }
+      // 先清掉五張、對子這些「一次走多張」的牌，同樣大小時出小的
+      pool.sort((a, b) => (baseStrength(a) - a.size * 8) - (baseStrength(b) - b.size * 8));
+      return (pool[0] || cs[0]).cards;
+    }
+    if (inPlan.length) {
+      const pick = inPlan.find(c => !isControl(c)) || inPlan[0];
+      if (!isControl(pick) || plan.length <= 3 || oppMin <= 3) return pick.cards;
+    }
+    if (oppMin <= 2 || active(S).length === 2) return aiChoose(S, pi, 'normal');
+    return null;
+  }
   function aiChoose(S, pi, diff) {
+    if (diff === 'hard') return aiHard(S, pi);
     const hand = S.hands[pi];
     const cs = legal(S, pi);
     if (!cs.length) return null;
@@ -248,7 +305,7 @@
     return best.cards;
   }
 
-  const API = { RL, SU, rk, su, nat, CLUB3, analyze, beats, genCombos, deal, newGame, validate, play, pass, legal, aiChoose, nextActive, baseStrength };
+  const API = { planHand, RL, SU, rk, su, nat, CLUB3, analyze, beats, genCombos, deal, newGame, validate, play, pass, legal, aiChoose, nextActive, baseStrength };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.BigTwo = API;
 })(this);

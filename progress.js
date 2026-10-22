@@ -42,6 +42,13 @@
     { id: 'em_basic', cat: 'emo', name: '基本嘴砲', price: 0, lines: ['快點啦', '好牌！', '你完了', '等等我', '哈哈哈', '手氣好爛'] },
     { id: 'em_taiwan', cat: 'emo', name: '台味嘴砲', price: 300, lines: ['夭壽骨', '衝啥啦', '穩了穩了', '歹勢啦', '母湯喔', '你很會喔'] },
     { id: 'em_trash', cat: 'emo', name: '嗆聲嘴砲', price: 800, lines: ['就這？', '認輸吧', '我在等你喔', '這把我贏定', '看我的！', '太慢了啦'] },
+    { id: 'fx_bubble', cat: 'fx', name: '漫畫對話框', price: 0, desc: '從頭像彈出大對話框' },
+    { id: 'fx_danmaku', cat: 'fx', name: '彈幕刷屏', price: 300, desc: '整排字從畫面飛過' },
+    { id: 'fx_hearts', cat: 'fx', name: '愛心泡泡', price: 400, desc: '愛心一顆顆往上飄' },
+    { id: 'fx_boom', cat: 'fx', name: '爆炸字', price: 600, desc: '集中線＋爆炸字＋震動' },
+    { id: 'fx_cutin', cat: 'fx', name: '動漫登場', price: 900, desc: '大頭像斜切登場' },
+    { id: 'fx_neon', cat: 'fx', name: '霓虹燈', price: 1200, desc: '夜店霓虹閃爍字' },
+    { id: 'fx_gold', cat: 'fx', name: '黃金降臨', price: 2500, desc: '金字＋金幣雨' },
   ];
   const item = id => SHOP.find(x => x.id === id);
 
@@ -100,7 +107,7 @@
   /* ---------- 存檔 ---------- */
   function fresh(now) {
     return { v: 1, coins: 200, rp: START_RP, streak: 0, best: 0, games: 0, wins: 0, born: now, seed: Math.floor(Math.random() * 1e9),
-      owned: ['av_pup', 'av_frog', 'av_chick', 'tb_mint', 'em_basic'], equip: { avatar: 'av_pup', table: 'tb_mint', emo: 'em_basic' },
+      owned: ['av_pup', 'av_frog', 'av_chick', 'tb_mint', 'em_basic'], equip: { avatar: 'av_pup', table: 'tb_mint', emo: 'em_basic', fx: 'fx_bubble' },
       checkin: { last: null, day: 0 }, daily: null, lastRank: null, friends: {}, log: [] };
   }
   function create(storage, nowFn) {
@@ -118,6 +125,8 @@
       }); } catch (e) {}
     }
     if (!P.ach) P.ach = {};
+    if (!P.owned.includes('fx_bubble')) P.owned.push('fx_bubble');
+    if (!P.equip.fx) P.equip.fx = 'fx_bubble';
     ['bk', 'rm'].forEach(g => { if (!P.st.byGame[g]) P.st.byGame[g] = { g: 0, w: 0, places: [0, 0, 0, 0] }; });
     const save = () => { try { storage.setItem(KEY, JSON.stringify(P)); } catch (e) {} };
 
@@ -182,11 +191,12 @@
       const base = (COINS[n][e.place] || 0);
       const mult = win ? streakMult(P.streak) : 1;
       const friendBonus = e.online ? 1.5 : 1;
-      const easy = e.diff === 'easy' && !e.online ? 0.7 : 1;
+      const easy = e.diff === 'easy' && !e.online ? 0.7 : e.diff === 'hard' ? 1.3 : 1;
       const coins = Math.round(base * mult * friendBonus * easy);
       let rpd = RP[n][e.place] || 0;
       if (win && P.streak > 1) rpd += Math.min(5, P.streak - 1) * 3;
       if (e.diff === 'easy' && !e.online) rpd = Math.round(rpd * (rpd > 0 ? 0.6 : 1));
+      if (e.diff === 'hard' && rpd > 0) rpd = Math.round(rpd * 1.25);
       P.rp = Math.max(0, P.rp + rpd);
       P.coins += coins;
       // 任務
@@ -213,6 +223,7 @@
       if (mult > 1) lines.push([`連勝 ${P.streak} 場 ×${mult}`, null]);
       if (friendBonus > 1) lines.push(['揪咖加成 ×1.5', null]);
       if (easy < 1) lines.push(['簡單電腦 ×0.7', null]);
+      if (easy > 1) lines.push(['困難電腦 ×1.3', null]);
       const unlocked = checkAch();
       const res = { coins, lines, rpd, before, after, streak: P.streak, tierUp: after.tier.i > before.tier.i, tierDown: after.tier.i < before.tier.i, unlocked };
       P.lastRank = after.rank;
@@ -320,6 +331,7 @@
       avatarKind: () => (item(P.equip.avatar) || item('av_pup')).kind,
       theme: () => (item(P.equip.table) || item('tb_mint')).theme,
       emoLines: () => (item(P.equip.emo) || item('em_basic')).lines,
+      fxId: () => (item(P.equip.fx) ? P.equip.fx : 'fx_bubble'),
       card: () => ({ rp: P.rp, kind: (item(P.equip.avatar) || item('av_pup')).kind, wins: P.wins }),
       exportCode, importCode, markBackup: () => { P.lastBackup = now(); save(); }, needBackup: () => P.games >= 3 && (!P.lastBackup || now() - P.lastBackup > 7 * 86400000),
     };
