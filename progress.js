@@ -297,7 +297,7 @@
     function importCode(code) {
       try {
         const m = String(code || '').replace(/\s+/g, '').match(/JK1-([A-Za-z0-9+/=]+)/);
-        if (!m) return { err: '這不是揪咖打牌的備份碼' };
+        if (!m) return { err: '這不是牌搭子的備份碼' };
         const d = JSON.parse(UNB64(m[1]));
         const np = d && d.p;
         if (!np || np.v !== 1 || typeof np.coins !== 'number' || typeof np.rp !== 'number' || !Array.isArray(np.owned)) return { err: '備份碼不完整，請整段重新複製' };

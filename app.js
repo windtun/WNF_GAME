@@ -1,4 +1,4 @@
-/* 揪咖打牌：畫面 + 房主（遊戲邏輯在房主手機上跑）+ 連線 */
+/* 牌搭子：畫面 + 房主（遊戲邏輯在房主手機上跑）+ 連線 */
 (function(){
 const B = window.BigTwo, X = window.Seven, K = window.Blokus, R = window.Rummi;
 const $ = id => document.getElementById(id);
@@ -115,7 +115,7 @@ function fx(text, soft){
 }
 
 /* ---------- 設定 ---------- */
-const GNAME={big2:'大老二', seven:'排七', mj:'麻將', bk:'方塊佔地', rm:'數字組牌'}, SKEY={big2:'jk_stats', seven:'jk_stats7', mj:'jk_statsmj', bk:'jk_statsbk', rm:'jk_statsrm'};
+const GNAME={big2:'大老二', seven:'排七', mj:'麻將', bk:'Blokus', rm:'拉密'}, SKEY={big2:'jk_stats', seven:'jk_stats7', mj:'jk_statsmj', bk:'jk_statsbk', rm:'jk_statsrm'};
 const MJLEN={one:'單局', round:'東風圈', full:'一將'};
 const QS = new URLSearchParams(location.search);
 const MOCK = QS.has('mock');
@@ -1153,7 +1153,7 @@ function celebrate(R){
 }
 
 /* 我的戰績 */
-const GLABEL={big2:'大老二', seven:'排七', mj:'麻將', bk:'方塊佔地', rm:'數字組牌'};
+const GLABEL={big2:'大老二', seven:'排七', mj:'麻將', bk:'Blokus', rm:'拉密'};
 function agoText(t){ const m=Math.max(0,(Date.now()-t)/60000); if(m<1) return '剛剛'; if(m<60) return Math.floor(m)+' 分鐘前'; if(m<1440) return Math.floor(m/60)+' 小時前'; return Math.floor(m/1440)+' 天前'; }
 function sparkSVG(h){
   if(h.length<2) return '<p class="note" style="text-align:center">再玩一局就會畫出走勢</p>';
@@ -1214,7 +1214,7 @@ function bragText(){
   const P=Prog.state, st=P.st, t=Prog.tierOf(P.rp), G=st.byGame, tg=Object.values(G).reduce((a,b)=>a+b.g,0), tw=Object.values(G).reduce((a,b)=>a+b.w,0);
   const name=($('nick').value.trim()||'我');
   const link = location.protocol.startsWith('http') && !location.hostname.endsWith('claude.ai') && !location.hostname.endsWith('claudeusercontent.com') ? '\n'+location.origin+location.pathname+'?openExternalBrowser=1' : '';
-  return `【揪咖打牌】${name} 的戰績\n段位：${t.name} ${P.rp} 分（全服 #${Prog.myRank()}）\n總場數 ${tg}，勝率 ${tg?Math.round(tw/tg*100):0}%，最高連勝 ${P.best}\n麻將最大一把 ${st.mjMaxTai} 台，成就 ${Prog.achState().filter(a=>a.got).length} 個\n敢來挑戰我嗎？${link}`;
+  return `【牌搭子】${name} 的戰績\n段位：${t.name} ${P.rp} 分（全服 #${Prog.myRank()}）\n總場數 ${tg}，勝率 ${tg?Math.round(tw/tg*100):0}%，最高連勝 ${P.best}\n麻將最大一把 ${st.mjMaxTai} 台，成就 ${Prog.achState().filter(a=>a.got).length} 個\n敢來挑戰我嗎？${link}`;
 }
 $('btnStats').addEventListener('click', ()=>{ Snd.init(); Snd.tap(); renderStats(); $('ovStats').hidden=false; $('statsBody').scrollTop=0; });
 $('pfAv').addEventListener('click', ()=>$('btnStats').click());
@@ -1556,7 +1556,7 @@ $('llChips').addEventListener('click', e=>{ const b=e.target.closest('.chip'); i
 $('ldChips').addEventListener('click', e=>{ const b=e.target.closest('.chip'); if(!b||!H||H.started) return; H.diff=b.dataset.d; prefs.diff=H.diff; Snd.tap(); broadcastLobby(); });
 $('btnGo').addEventListener('click', ()=>{ if(!H) return; store.set('jk_prefs',prefs); Snd.init(); hostStart(); });
 $('btnCopy').addEventListener('click', ()=>{
-  const link=inviteLink(), t=`來玩${GNAME[H?H.type:prefs.game]}！房號 ${C.code}\n${link}`;
+  const link=inviteLink(), t=`【牌搭子】來玩${GNAME[H?H.type:prefs.game]}！房號 ${C.code}\n點連結直接進房：${link}`;
   navigator.clipboard && navigator.clipboard.writeText(t).then(()=>toast('已複製邀請，貼到 LINE 就好'), ()=>{ $('linkText').textContent=link; toast('請長按下面的連結複製'); });
   if(!navigator.clipboard){ $('linkText').textContent=link; }
 });
@@ -1609,6 +1609,7 @@ function guestLost(){
 }
 
 function exitToMenu(){
+  try{ if(new URLSearchParams(location.search).has('r')){ const u=new URL(location.href); u.searchParams.delete('r'); history.replaceState(null,'',u.pathname+(u.search||'')+u.hash); } }catch(e){}
   if(C && C.mode==='guest'){ C.leaving=true; try{ C.conn && C.conn.send({t:'leave'}); }catch(e){} const n=C.net; setTimeout(()=>{ try{ n&&n.close(); }catch(e){} }, 200); }
   if(H){ clearTimeout(H.timer); if(H.net){ H.conns.forEach(w=>w.send({t:'closed'})); const n=H.net; setTimeout(()=>n.close(), 300); } H=null; }
   C=null;
@@ -1643,8 +1644,23 @@ if(!P2P){
   $('btnHost').disabled=true; $('btnJoin').disabled=true; $('joinCode').disabled=true;
   $('netNote').textContent='這裡不能連線。請從 GitHub Pages 上的網址打開，就能開房跟朋友玩。';
 }
+// 從邀請連結進來：有暱稱就直接進房；沒有暱稱先跳出輸入框，填完馬上進房
 const inv = (QS.get('r')||'').replace(/\D/g,'').slice(0,4);
-if(inv){ $('joinCode').value=inv; $('netPanel').classList.add('invited'); $('netNote').textContent = P2P ? `朋友邀你進房 ${inv}，輸入暱稱後按「加入」` : $('netNote').textContent; }
+if(inv){
+  $('joinCode').value=inv; $('netPanel').classList.add('invited');
+  $('netNote').textContent = P2P ? `朋友邀你進房 ${inv}` : $('netNote').textContent;
+  if(P2P){
+    const saved = (store.get('jk_nick','')||'').trim();
+    if(saved){ setTimeout(()=>{ if(!C) $('btnJoin').click(); }, 250); }
+    else { $('invCode').textContent=inv; $('ovInvite').hidden=false; setTimeout(()=>{ try{ $('invNick').focus(); }catch(e){} }, 200); }
+  }
+}
+$('btnInvGo').addEventListener('click', ()=>{
+  const v=$('invNick').value.trim().slice(0,8);
+  if(!v){ toast('先取個暱稱'); Snd.err(); return; }
+  $('nick').value=v; store.set('jk_nick', v); $('ovInvite').hidden=true; renderProfile(); $('btnJoin').click();
+});
+$('invNick').addEventListener('keydown', e=>{ if(e.key==='Enter') $('btnInvGo').click(); });
 
 let wake=null;
 async function keepAwake(){ try{ if(navigator.wakeLock && !wake){ wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release',()=>wake=null); } }catch(e){} }

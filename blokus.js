@@ -1,4 +1,4 @@
-/* 方塊佔地（Blokus 玩法）規則引擎：純邏輯，房主手機上跑 */
+/* Blokus規則引擎：純邏輯，房主手機上跑 */
 (function (root) {
   // 21 塊方塊，座標 [x,y]
   const SHAPES = [
