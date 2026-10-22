@@ -86,7 +86,7 @@
     { id: 'top1', name: '天下第一', desc: '拿下全服第一', cat: 'rank', goal: 1, reward: 3000, val: S => (S.st.bestRank === 1 ? 1 : 0) },
     { id: 'fr10', name: '揪咖王', desc: '跟朋友連線玩 10 局', cat: 'play', goal: 10, reward: 300, val: S => S.st.online },
   ];
-  const newStats = () => ({ byGame: { big2: { g: 0, w: 0, places: [0, 0, 0, 0] }, seven: { g: 0, w: 0, places: [0, 0, 0, 0] }, mj: { g: 0, w: 0, places: [0, 0, 0, 0] } },
+  const newStats = () => ({ byGame: { big2: { g: 0, w: 0, places: [0, 0, 0, 0] }, seven: { g: 0, w: 0, places: [0, 0, 0, 0] }, mj: { g: 0, w: 0, places: [0, 0, 0, 0] }, bk: { g: 0, w: 0, places: [0, 0, 0, 0] }, rm: { g: 0, w: 0, places: [0, 0, 0, 0] } },
     coinsEarned: 0, peakRp: START_RP, bestRank: null, bombs: 0, sevenClean: 0, mjHu: 0, mjTsumo: 0, mjMaxTai: 0, mjBest: null, online: 0, rpHist: [START_RP], h2h: {}, firstDay: null, days: 0, lastDay: null });
 
   function rng(seed) {
@@ -118,6 +118,7 @@
       }); } catch (e) {}
     }
     if (!P.ach) P.ach = {};
+    ['bk', 'rm'].forEach(g => { if (!P.st.byGame[g]) P.st.byGame[g] = { g: 0, w: 0, places: [0, 0, 0, 0] }; });
     const save = () => { try { storage.setItem(KEY, JSON.stringify(P)); } catch (e) {} };
 
     function daily() {

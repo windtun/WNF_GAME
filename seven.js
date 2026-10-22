@@ -91,7 +91,7 @@
      2. 蓋牌：不只挑點數小的，還會挑「蓋了能卡死別人」的牌——
         蓋掉一張 6，其他人手上的 5、4、3… 就永遠接不上，只能一起蓋。 */
   function beyond(v, dir) { const out = []; if (dir < 0) for (let x = v - 1; x >= 1; x--) out.push(x); else for (let x = v + 1; x <= 13; x++) out.push(x); return out; }
-  const W = { my: 3, myPts: 0.15, next: 3, opp: 0.6, oppPts: 0.08, dead: 2, seven: 4, blockBig: 0.45, blockSmall: 0.3, far: 0.8 };
+  const W = { my: 3, myPts: 0.15, next: 3, opp: 0.6, oppPts: 0.08, dead: 2, seven: 4, block: 1 };
   function aiChoose(S, pi, diff, w) {
     w = w || W;
     const hand = S.hands[pi], ps = playable(S, pi);
@@ -104,7 +104,6 @@
     const myCov = S.covered[pi];
     // 還沒出現的牌（不在我手上、不在桌上、不是我蓋的）＝可能在別人手上
     const unseen = (s, v) => !mine(s, v) && !onBoard(s, v) && !myCov.some(x => su(x) === s && nat(x) === v);
-    const lenOpp = Math.max(1, S.hands.reduce((a, h, i) => a + (i === pi ? 0 : h.length), 0));
     // 某個方向：我的牌各差幾步、別人可能有幾張
     function side(s, v, dir) {
       let myPts = 0, myN = 0, oppN = 0, oppPts = 0, gap = 0, firstMine = null;
@@ -134,21 +133,26 @@
       }
       return { play: best };
     }
-    // 蓋牌：自己損失的點數 − 卡死別人的效果
+    // 蓋牌：挑「讓別人蓋最多、自己蓋最少」的那張
+    //   自己要蓋的點數 ＝ 這張 ＋ 我手上被它卡死的牌（之後也只能蓋）
+    //   別人要蓋的點數 ＝ 被它卡死、還沒出現的牌的點數 × 這些牌還在別人手上的機率
+    //   （沒出現的牌也可能早就被別人蓋掉了，那些不會再多扣別人分數）
+    const othersHand = S.hands.reduce((a, h, i) => a + (i === pi ? 0 : h.length), 0);
+    const othersCov = S.covered.reduce((a, c, i) => a + (i === pi ? 0 : c.length), 0);
+    const inHand = othersHand + othersCov ? othersHand / (othersHand + othersCov) : 0;
+    const opps = Math.max(1, S.hands.filter((h, i) => i !== pi && h.length).length);
     let best = null, bc = Infinity;
     for (const id of hand) {
-      const s = su(id), v = nat(id), b = S.board[s];
+      const s = su(id), v = nat(id);
       const dirs = v === 7 ? [-1, 1] : [v < 7 ? -1 : 1];
-      let cost = v, block = 0;
+      let mine = v, theirs = 0;
       for (const d of dirs) {
         const sd = side(s, v, d);
-        cost += sd.myPts;                                // 後面我的牌也會被卡住，要一起蓋
-        block += sd.oppPts * (lenOpp > 6 ? w.blockBig : w.blockSmall); // 別人手上可能被卡住的點數
+        mine += sd.myPts;
+        theirs += sd.oppPts * inHand;
       }
-      // 卡住的牌之前，中間還有別人能接的牌時，卡人效果打折
-      const edge = !b ? 7 : (v < 7 ? b.lo : b.hi);
-      if (v !== 7 && Math.abs(v - edge) > 1) block *= w.far;
-      const score = cost - block + Math.random() * 0.2;
+      // 名次是跟每個對手一一比：卡人的點數會分攤到好幾個對手身上，自己蓋的點數卻是全扣在自己身上
+      const score = mine * opps - theirs * w.block + Math.random() * 0.2;
       if (score < bc) { bc = score; best = id; }
     }
     return { cover: best };

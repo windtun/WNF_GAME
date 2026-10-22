@@ -1,6 +1,6 @@
 /* 揪咖打牌：畫面 + 房主（遊戲邏輯在房主手機上跑）+ 連線 */
 (function(){
-const B = window.BigTwo, X = window.Seven;
+const B = window.BigTwo, X = window.Seven, K = window.Blokus, R = window.Rummi;
 const $ = id => document.getElementById(id);
 const store = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
@@ -115,7 +115,7 @@ function fx(text, soft){
 }
 
 /* ---------- 設定 ---------- */
-const GNAME={big2:'大老二', seven:'排七', mj:'麻將'}, SKEY={big2:'jk_stats', seven:'jk_stats7', mj:'jk_statsmj'};
+const GNAME={big2:'大老二', seven:'排七', mj:'麻將', bk:'方塊佔地', rm:'數字組牌'}, SKEY={big2:'jk_stats', seven:'jk_stats7', mj:'jk_statsmj', bk:'jk_statsbk', rm:'jk_statsrm'};
 const MJLEN={one:'單局', round:'東風圈', full:'一將'};
 const QS = new URLSearchParams(location.search);
 const MOCK = QS.has('mock');
@@ -260,7 +260,7 @@ function hostStart(){
   const n = H.type==='mj' ? 4 : Math.max(H.n, hs.length);
   H.seats = hs.map((s,i)=>({...s, kind:(s.card&&PAL[s.card.kind])?s.card.kind:HUMAN_KINDS[i]}))
     .concat(BOTS.slice(0, n-hs.length).map(([name,kind])=>({name, kind, human:false, online:true})));
-  H.S = H.type==='mj' ? MJ.newMatch(H.mjLen) : H.type==='seven' ? X.newGame(n) : B.newGame(n);
+  H.S = H.type==='mj' ? MJ.newMatch(H.mjLen) : H.type==='bk' ? K.newGame(n) : H.type==='rm' ? R.newGame(n) : H.type==='seven' ? X.newGame(n) : B.newGame(n);
   H.lastKey = null;
   H.started = true; H.gid++; H.ev = {seq:0};
   hostSchedule(true);
@@ -279,9 +279,12 @@ function viewFor(si){
   const S=H.S;
   const V = { type:H.type, gid:H.gid, n:S.n, me:si, turn:S.turn, over:S.over, ver:S.ver, ev:H.ev,
     players: H.seats.map(s=>({name:s.name, kind:s.kind, bot:!s.human, online:s.online, rp:s.card?s.card.rp:null})),
-    hand: S.hands[si].slice(), counts: S.hands.map(h=>h.length), order: S.order.slice(),
+    hand: H.type==='bk' ? [] : (H.type==='rm' ? S.racks : S.hands)[si].slice(),
+    counts: H.type==='bk' ? S.left.map(l=>l.reduce((a,pc)=>a+K.SIZE[pc],0)) : (H.type==='rm' ? S.racks : S.hands).map(h=>h.length), order: S.order.slice(),
     timed: !!H.deadline, left: H.deadline ? Math.max(0, H.deadline-Date.now()) : 0, online: H.online };
   if(H.type==='mj') Object.assign(V, mjView(si));
+  else if(H.type==='bk') Object.assign(V, {N:S.N, duo:S.duo, starts:S.starts, board:S.board, pieces:S.left, first:S.first, out:S.out, last:S.last, score:S.score, status:S.status});
+  else if(H.type==='rm') Object.assign(V, {table:S.table, pool:S.pool.length, melded:S.melded, last:S.last, score:S.score, status:S.status, racksAll: S.over ? S.racks : null});
   else if(H.type==='big2') Object.assign(V, {table:S.table, first:S.first, done:S.done.slice(), status:S.status.slice()});
   else Object.assign(V, {board:S.board, covN:S.covered.map(c=>c.length), myCov:S.covered[si].slice(), last:S.last, score:S.score||null, covAll: S.over ? S.covered.map(c=>c.slice()) : null});
   return JSON.parse(JSON.stringify(V));
@@ -303,14 +306,21 @@ function hostSchedule(first){
   if(!s.human || !s.online){
     H.timer=setTimeout(()=>{ if(guard()) botMove(false); }, (first?1300:0) + (s.human?1000:650+Math.random()*500));
   } else if(H.online && humans().length>1){
-    H.deadline = Date.now() + TURN_MS + (first?1500:0);
-    H.timer=setTimeout(()=>{ if(guard()) botMove(true); }, TURN_MS + (first?1500:0));
+    const ms = (H.type==='rm' ? 60000 : TURN_MS) + (first?1500:0);
+    H.deadline = Date.now() + ms;
+    H.timer=setTimeout(()=>{ if(guard()) botMove(true); }, ms);
   }
 }
 
 function botMove(timeout){
   const S=H.S, si=S.turn, diff = H.seats[si].human ? 'normal' : H.diff;
-  if(H.type==='seven'){
+  if(H.type==='bk'){
+    const m=K.aiChoose(S, si, diff);
+    applyAct(si, m ? {k:'place', piece:m.piece, cells:m.cells} : {k:'pass'});
+  } else if(H.type==='rm'){
+    const m = timeout ? {t:'draw'} : R.aiChoose(S, si, diff);
+    applyAct(si, m.t==='draw' ? {k:'draw'} : {k:'commit', table:m.table});
+  } else if(H.type==='seven'){
     const c=X.aiChoose(S, si, diff);
     applyAct(si, c.play!=null ? {k:'play7', id:c.play} : {k:'cover', id:c.cover});
   } else {
@@ -327,7 +337,13 @@ function hostAct(si, a){
 function applyAct(si, a){
   const S=H.S; let r; const ev={by:si};
   if(H.type==='mj'){ r=MJ.act(S, si, a.a||{}); if(r.err) return r.err; mjAfter(); return null; }
-  if(H.type==='big2'){
+  if(H.type==='bk'){
+    if(a.k==='pass'){ r=K.pass(S,si); ev.k='pass'; }
+    else { r=K.place(S, si, a.piece|0, (a.cells||[]).map(c=>[c[0]|0,c[1]|0])); ev.k='place'; ev.size=r.size; }
+  } else if(H.type==='rm'){
+    if(a.k==='draw'){ r=R.draw(S,si); ev.k='draw'; }
+    else { r=R.commit(S, si, a.table); ev.k='play'; ev.n=r.n; ev.win=r.win; }
+  } else if(H.type==='big2'){
     if(a.k==='pass'){ r=B.pass(S,si); ev.k='pass'; }
     else { r=B.play(S, si, (a.ids||[]).map(Number)); ev.k='play';
       if(r.info){ ev.name=r.info.name; ev.bomb=r.info.bomb; ev.big=r.info.size===5 && r.info.type!=='straight'; ev.last=r.last; } }
@@ -386,6 +402,13 @@ function applyView(V){
 }
 function playEv(ev){
   if(C.V && C.V.type==='mj'){ mjEv(ev); return; }
+  if(C.V && (C.V.type==='bk' || C.V.type==='rm')){
+    if(ev.k==='pass'||ev.k==='draw'){ Snd.pass(); return; }
+    Snd.play();
+    if(ev.k==='place' && ev.size===5 && ev.by===C.V.me) Snd.tap();
+    if(ev.k==='play' && ev.n>=4) fx(`一口氣 ${ev.n} 張！`, true);
+    return;
+  }
   if(ev.bomb && C.V && ev.by===C.V.me) C.bombs=(C.bombs||0)+1;
   if(ev.k==='pass'||ev.k==='cover'){ Snd.pass(); return; }
   Snd.play();
@@ -402,6 +425,8 @@ function showGame(){
   const V=C.V, t=$('table');
   t.className='table n'+V.n+(V.type==='seven'?' seven':'');
   $('mjRes').hidden=true; $('mjRes').dataset.k='';
+  if(V.type==='bk') bkBuild();
+  if(V.type==='rm') C.rm=null;
   document.body.className='g-'+V.type;
   $('ttl').textContent = GNAME[V.type] + (C.mode==='guest' || (H&&H.online) ? ` · 房號 ${C.code||H.code}` : '');
   $('btnPlay').textContent = V.type==='seven' ? '蓋牌' : '出牌';
@@ -426,6 +451,8 @@ function seatTail(V, pi){
 function render(first){
   const V=C.V;
   if(V.type==='mj'){ renderMJ(); tick(); return; }
+  if(V.type==='bk'){ renderBK(); tick(); return; }
+  if(V.type==='rm'){ renderRM(); tick(); return; }
   if(V.type==='seven') render7(); else render2();
   renderHand(first);
   updateButtons();
@@ -742,7 +769,7 @@ function finish(){
       const st2=store.get(SKEY[V.type],{})[nm];
       $('resSub').textContent = st2 ? `${GNAME[V.type]}累計 ${st2.games} 局，第一名 ${st2.places[0]} 次` : '';
       $('resList').innerHTML = C.V.order.map((pi,k)=>{ const p=C.V.players[pi];
-        return `<div class="rk p${k+1} ${pi===C.V.me?'me':''}"><span class="no">${k+1}</span><div class="av">${avatar(p.kind)}</div><span class="nm">${esc(p.name)}</span>${C.V.type==='mj'?`<span class="stat">${C.V.scores[pi]>0?'+':''}${C.V.scores[pi]} 分</span>`:''}${C.V.type==='seven'&&C.V.score?`<span class="stat">蓋 ${C.V.covN[pi]} 張 · ${C.V.score[pi]} 點</span>`:''}</div>${C.V.type==='seven'&&C.V.covAll&&C.V.covAll[pi].length?`<div class="rcov">${covCards(C.V.covAll[pi])}</div>`:''}`; }).join('');
+        return `<div class="rk p${k+1} ${pi===C.V.me?'me':''}"><span class="no">${k+1}</span><div class="av">${avatar(p.kind)}</div><span class="nm">${esc(p.name)}</span>${C.V.type==='mj'?`<span class="stat">${C.V.scores[pi]>0?'+':''}${C.V.scores[pi]} 分</span>`:''}${C.V.type==='bk'&&C.V.score?`<span class="stat">${C.V.score[pi]>0?'+':''}${C.V.score[pi]} 分 · 剩 ${C.V.pieces[pi].length} 塊</span>`:''}${C.V.type==='rm'&&C.V.score?`<span class="stat">剩 ${C.V.counts[pi]} 張 · ${C.V.score[pi]} 點</span>`:''}${C.V.type==='seven'&&C.V.score?`<span class="stat">蓋 ${C.V.covN[pi]} 張 · ${C.V.score[pi]} 點</span>`:''}</div>${C.V.type==='seven'&&C.V.covAll&&C.V.covAll[pi].length?`<div class="rcov">${covCards(C.V.covAll[pi])}</div>`:''}`; }).join('');
       const isHost = C.mode==='host', online = isHost ? H.online : true;
       $('btnAgain').hidden = !isHost; $('btnRoom').hidden = !(isHost && online);
       $('btnHome').textContent = online ? '離開房間' : '回大廳';
@@ -1126,7 +1153,7 @@ function celebrate(R){
 }
 
 /* 我的戰績 */
-const GLABEL={big2:'大老二', seven:'排七', mj:'麻將'};
+const GLABEL={big2:'大老二', seven:'排七', mj:'麻將', bk:'方塊佔地', rm:'數字組牌'};
 function agoText(t){ const m=Math.max(0,(Date.now()-t)/60000); if(m<1) return '剛剛'; if(m<60) return Math.floor(m)+' 分鐘前'; if(m<1440) return Math.floor(m/60)+' 小時前'; return Math.floor(m/1440)+' 天前'; }
 function sparkSVG(h){
   if(h.length<2) return '<p class="note" style="text-align:center">再玩一局就會畫出走勢</p>';
@@ -1143,7 +1170,7 @@ function sparkSVG(h){
 }
 function renderStats(){
   const P=Prog.state, st=P.st, t=Prog.tierOf(P.rp), name=($('nick').value.trim()||'我').slice(0,8);
-  const G=st.byGame, tg=G.big2.g+G.seven.g+G.mj.g, tw=G.big2.w+G.seven.w+G.mj.w, wr = tg ? Math.round(tw/tg*100) : 0;
+  const G=st.byGame, tg=Object.values(G).reduce((a,b)=>a+b.g,0), tw=Object.values(G).reduce((a,b)=>a+b.w,0), wr = tg ? Math.round(tw/tg*100) : 0;
   const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
   const A=Prog.achState().sort((x,y)=>(!!y.got-!!x.got) || (y.n/y.goal - x.n/x.goal)), got=A.filter(a=>a.got).length;
   let h = `<div class="sthero">
@@ -1159,7 +1186,7 @@ function renderStats(){
   <span class="lbl">積分走勢（最近 ${st.rpHist.length} 局）</span>
   <div class="stcard">${sparkSVG(st.rpHist)}</div>
   <span class="lbl">各遊戲</span>
-  <div class="stgames">${['big2','seven','mj'].map(g=>{ const b=G[g], tot=b.places.reduce((a,c)=>a+c,0)||1;
+  <div class="stgames">${['big2','seven','mj','bk','rm'].map(g=>{ const b=G[g]||{g:0,w:0,places:[0,0,0,0]}, tot=b.places.reduce((a,c)=>a+c,0)||1;
     return `<div class="stg"><b>${GLABEL[g]}</b><span class="wr">${pct(b.w,b.g)}</span><small>${b.g} 局 · ${b.w} 勝</small>
       <div class="plbar">${b.places.map((v,i)=>v?`<i class="p${i}" style="flex:${v}" title="第 ${i+1} 名 ${v} 次"></i>`:'').join('')||'<i class="p9" style="flex:1"></i>'}</div></div>`; }).join('')}</div>
   <div class="pllegend"><span><i class="p0"></i>第 1</span><span><i class="p1"></i>第 2</span><span><i class="p2"></i>第 3</span><span><i class="p3"></i>第 4</span></div>
@@ -1184,7 +1211,7 @@ function renderStats(){
   $('statsBody').innerHTML = h;
 }
 function bragText(){
-  const P=Prog.state, st=P.st, t=Prog.tierOf(P.rp), G=st.byGame, tg=G.big2.g+G.seven.g+G.mj.g, tw=G.big2.w+G.seven.w+G.mj.w;
+  const P=Prog.state, st=P.st, t=Prog.tierOf(P.rp), G=st.byGame, tg=Object.values(G).reduce((a,b)=>a+b.g,0), tw=Object.values(G).reduce((a,b)=>a+b.w,0);
   const name=($('nick').value.trim()||'我');
   const link = location.protocol.startsWith('http') && !location.hostname.endsWith('claude.ai') && !location.hostname.endsWith('claudeusercontent.com') ? '\n'+location.origin+location.pathname+'?openExternalBrowser=1' : '';
   return `【揪咖打牌】${name} 的戰績\n段位：${t.name} ${P.rp} 分（全服 #${Prog.myRank()}）\n總場數 ${tg}，勝率 ${tg?Math.round(tw/tg*100):0}%，最高連勝 ${P.best}\n麻將最大一把 ${st.mjMaxTai} 台，成就 ${Prog.achState().filter(a=>a.got).length} 個\n敢來挑戰我嗎？${link}`;
@@ -1200,11 +1227,286 @@ function announceAch(list){
   (list||[]).forEach((a,i)=>setTimeout(()=>{ toast(`解鎖成就「${a.name}」＋${a.reward} 金幣`, 2200); Snd.join(); }, 1600+i*2300));
 }
 
+/* ================= 方塊佔地 ================= */
+const BK_COL = ['#3B82F6','#F5B700','#EF4444','#22B35A'];
+function bkLocal(){ const V=C.V; return {n:V.n, N:V.N, starts:V.starts, board:V.board, left:V.pieces, first:V.first, out:V.out, turn:V.turn, over:V.over}; }
+function bkPivot(shape){ const cx=shape.reduce((a,c)=>a+c[0],0)/shape.length, cy=shape.reduce((a,c)=>a+c[1],0)/shape.length;
+  let best=shape[0], bd=1e9; shape.forEach(c=>{ const d=(c[0]-cx)**2+(c[1]-cy)**2; if(d<bd){bd=d;best=c;} }); return best; }
+const bkShapeKey = sh => K.norm(sh).map(c=>c.join(',')).join(';');
+function bkCellsAt(shape, at){ const pv=bkPivot(shape); return shape.map(([x,y])=>[x-pv[0]+at[0], y-pv[1]+at[1]]); }
+function bkCells(){ const b=C.bk; return (b && b.piece!=null && b.at) ? bkCellsAt(b.shape, b.at) : null; }
+function pieceSVG(shape, color, u){
+  u=u||9; const w=Math.max(...shape.map(c=>c[0]))+1, h=Math.max(...shape.map(c=>c[1]))+1, r=u*0.22;
+  return `<svg viewBox="-1 -1 ${w*u+2} ${h*u+3}" width="${w*u+2}" height="${h*u+3}" aria-hidden="true">${shape.map(([x,y])=>
+    `<rect x="${x*u}" y="${y*u+1}" width="${u}" height="${u}" rx="${r}" fill="#1B1B3A" opacity=".35"/><rect x="${x*u}" y="${y*u}" width="${u}" height="${u}" rx="${r}" fill="${color}" stroke="#1B1B3A" stroke-width="1.1"/><rect x="${x*u+u*.18}" y="${y*u+u*.14}" width="${u*.5}" height="${u*.2}" rx="${u*.1}" fill="#fff" opacity=".45"/>`).join('')}</svg>`;
+}
+function bkBuild(){
+  const V=C.V, g=$('bkBoard'); g.style.setProperty('--n', V.N);
+  let h=''; for(let i=0;i<V.N*V.N;i++) h+=`<i data-i="${i}"></i>`;
+  g.innerHTML=h;
+  C.bk={piece:null, shape:null, at:null, ver:-1, moves:null, drop:null, prevBoard:null};
+}
+function bkMoves(){
+  const V=C.V;
+  if(C.bk.ver!==V.ver){ C.bk.ver=V.ver; C.bk.moves = (V.turn===V.me && !V.over) ? K.legalMoves(bkLocal(), V.me) : []; }
+  return C.bk.moves;
+}
+// 目前選的方塊、目前方向，所有能放的位置（以樞紐格表示）
+function bkSpots(){
+  const b=C.bk; if(b.piece==null) return new Map();
+  const key=bkShapeKey(b.shape), pv=bkPivot(b.shape), out=new Map(), N=C.V.N;
+  bkMoves().forEach(m=>{ if(m.piece!==b.piece || bkShapeKey(m.cells)!==key) return;
+    const mx=Math.min(...m.cells.map(c=>c[0])), my=Math.min(...m.cells.map(c=>c[1]));
+    out.set((pv[1]+my)*N+pv[0]+mx, [pv[0]+mx, pv[1]+my]); });
+  return out;
+}
+// 吸附：手指附近 2 格內有能放的位置就自動對準
+function bkSnap(at){
+  const spots=bkSpots(), N=C.V.N; if(spots.has(at[1]*N+at[0])) return {at, snapped:false};
+  let best=null, bd=5.1;
+  spots.forEach(p=>{ const d=(p[0]-at[0])**2+(p[1]-at[1])**2; if(d<bd){bd=d;best=p;} });
+  return best ? {at:best, snapped:true} : {at, snapped:false};
+}
+function bkRenderBoard(){
+  const V=C.V, me=V.me, myTurn=V.turn===me && !V.over;
+  const cells=$('bkBoard').children, ghost=bkCells(), gset=new Set();
+  let legal=false;
+  if(ghost && myTurn){ legal = !K.validate(bkLocal(), me, C.bk.piece, ghost); ghost.forEach(([x,y])=>{ if(x>=0&&y>=0&&x<V.N&&y<V.N) gset.add(y*V.N+x); }); }
+  C.bk.legal=legal;
+  const spots = myTurn && C.bk.piece!=null ? bkSpots() : new Map();
+  const anc = myTurn && C.bk.piece==null ? new Set(K.anchors(bkLocal(), me).map(([x,y])=>y*V.N+x)) : new Set();
+  const last = V.last ? new Set(V.last.cells.map(([x,y])=>y*V.N+x)) : new Set();
+  const starts = new Map(V.starts.map(([x,y],i)=>[y*V.N+x,i]));
+  const prev=C.bk.prevBoard;
+  for(let i=0;i<cells.length;i++){
+    const o=V.board[i], el=cells[i];
+    el.style.setProperty('--c', o>=0 ? BK_COL[o] : '');
+    let cls = o>=0 ? 'f' : '';
+    if(o>=0 && prev && prev[i]<0) cls+=' drop';
+    if(last.has(i)) cls+=' last';
+    if(o<0 && anc.has(i)) cls+=' anc';
+    if(o<0 && spots.has(i)) cls+=' spot';
+    if(o<0 && starts.has(i) && V.first[starts.get(i)]) { cls+=' st'; el.style.setProperty('--sc', BK_COL[starts.get(i)]); }
+    if(gset.has(i)) cls+= legal ? ' gh ok' : ' gh bad';
+    if(el.className!==cls) el.className=cls;
+  }
+  if(prev && cells.length){ [...cells].forEach((el,i)=>{ if(el.classList.contains('drop')) el.style.animationDelay=((i%7)*25)+'ms'; }); }
+  C.bk.prevBoard=V.board.slice();
+  // 浮動操作列：貼在預覽方塊旁邊
+  const fb=$('bkFloat');
+  if(ghost && myTurn && !C.bk.dragging){
+    const N=V.N, minY=Math.min(...ghost.map(c=>c[1])), maxY=Math.max(...ghost.map(c=>c[1])), cx=ghost.reduce((a,c)=>a+c[0],0)/ghost.length;
+    const up = minY > N*0.35, W=$('bkBoard').getBoundingClientRect().width;
+    fb.hidden=false;
+    const half=(fb.offsetWidth||170)/2, px=(cx+0.5)/N*W;
+    fb.style.left=Math.min(W-half-2, Math.max(half+2, px))+'px';
+    fb.style.top = up ? (minY/N*100)+'%' : ((maxY+1)/N*100)+'%';
+    fb.className = up ? 'up' : 'down';
+    $('bkfOk').disabled=!legal;
+  } else fb.hidden=true;
+}
+function renderBK(){
+  const V=C.V, me=V.me, myTurn=V.turn===me && !V.over;
+  if(!$('bkBoard').children.length || $('bkBoard').children.length!==V.N*V.N) bkBuild();
+  if(!myTurn && C.bk.piece!=null){ C.bk.piece=null; C.bk.at=null; }
+  $('bkBoard').style.setProperty('--me', BK_COL[me]); $('bkFloat').style.setProperty('--me', BK_COL[me]);
+  $('bkPlayers').innerHTML = V.players.map((p,i)=>`<div class="bkp ${V.turn===i&&!V.over?'turn':''} ${V.out[i]?'out':''} ${i===me?'me':''}" style="--pc:${BK_COL[i]}">
+    <span class="bkav">${avatar(p.kind)}</span><span class="bkn">${esc(i===me?'我':p.name)}</span>
+    <span class="bkc">${V.counts[i]}格</span>${V.status[i]?`<em>${esc(V.status[i])}</em>`:''}${seatTail(V,i)}</div>`).join('');
+  bkRenderBoard();
+  const moves = bkMoves(), can = new Set(moves.map(m=>m.piece));
+  $('bkTray').innerHTML = V.pieces[me].slice().sort((a,b)=>K.SIZE[b]-K.SIZE[a]||a-b).map(pc=>
+    `<button class="bkpc ${C.bk.piece===pc?'on':''} ${myTurn&&!can.has(pc)?'no':''}" data-pc="${pc}" aria-label="${K.SIZE[pc]} 格方塊">${pieceSVG(C.bk.piece===pc?C.bk.shape:K.SHAPES[pc], BK_COL[me], 9)}</button>`).join('')
+    || '<span class="note">全部放完了！</span>';
+  const ghost=bkCells();
+  const tag = V.over ? '這局結束' : myTurn ? (C.bk.piece==null ? '把下面的方塊拖到棋盤上，或點一下選起來' : ghost ? (C.bk.legal ? '可以放！按 ✓ 確定' : '這裡不能放，拖到亮點的位置') : '亮點是這塊能放的位置，點一下或拖過去')
+    : `等 ${esc(V.players[V.turn].name)} 放方塊…`;
+  $('bkTag').innerHTML = tag + (myTurn&&V.timed?' <span class="tleft"></span>':'');
+  $('bkPlace').disabled = !myTurn || !ghost || !C.bk.legal;
+  $('bkPlace').classList.toggle('ready', myTurn && !!ghost && C.bk.legal);
+  ['bkRot','bkFlip'].forEach(id=>$(id).disabled = !myTurn || C.bk.piece==null);
+  $('bkHint').disabled = !myTurn;
+  $('bkSel').innerHTML = C.bk.piece!=null ? pieceSVG(C.bk.shape, BK_COL[me], 12) : '<span>選中的方塊</span>';
+}
+function bkSelect(pc){ C.bk.piece=pc; C.bk.shape=K.norm(K.SHAPES[pc]); C.bk.at=null; }
+function bkTransform(fn){
+  if(C.bk.piece==null) return;
+  C.bk.shape=fn(C.bk.shape);
+  if(C.bk.at){ const r=bkSnap(C.bk.at); if(r.snapped && Math.abs(r.at[0]-C.bk.at[0])+Math.abs(r.at[1]-C.bk.at[1])<=2) C.bk.at=r.at; }
+  Snd.tap(); renderBK();
+}
+function bkPlaceNow(){
+  const cells=bkCells(); if(!cells || !C.bk.legal) return;
+  const pc=C.bk.piece; C.bk.piece=null; C.bk.at=null; C.bk.shape=null;
+  try{ navigator.vibrate && navigator.vibrate(15); }catch(e){}
+  sendAct({k:'place', piece:pc, cells});
+}
+function bkCellFromPoint(x, y){
+  const g=$('bkBoard'), r=g.getBoundingClientRect(), N=C.V.N;
+  if(x<r.left||y<r.top||x>r.right||y>r.bottom) return null;
+  return [Math.min(N-1,Math.floor((x-r.left)/r.width*N)), Math.min(N-1,Math.floor((y-r.top)/r.height*N))];
+}
+/* 拖拉：從方塊盤往上拖、或拖動棋盤上的預覽 */
+const DRAG_LIFT = 64;
+let bkDrag=null;
+function bkDragStart(e, fromBoard){
+  const V=C&&C.V; if(!V||V.turn!==V.me||V.over) return;
+  bkDrag={id:e.pointerId, x0:e.clientX, y0:e.clientY, started:fromBoard, fromBoard};
+  if(fromBoard) bkDragBegin(e);
+}
+function bkDragBegin(e){
+  bkDrag.started=true; C.bk.dragging=true;
+  const cs=$('bkBoard').getBoundingClientRect().width/C.V.N, el=$('bkDragEl');
+  el.innerHTML=pieceSVG(C.bk.shape, BK_COL[C.V.me], Math.max(14,cs*1.05)); el.hidden=false;
+  bkDragMove(e); Snd.tap();
+}
+function bkDragMove(e){
+  if(!bkDrag||e.pointerId!==bkDrag.id) return;
+  if(!bkDrag.started){
+    const dx=e.clientX-bkDrag.x0, dy=e.clientY-bkDrag.y0;
+    if(dy<-10 && Math.abs(dy)>Math.abs(dx)) bkDragBegin(e); else { if(Math.abs(dx)>12) bkDrag=null; return; }
+  }
+  e.preventDefault();
+  const el=$('bkDragEl'), lift=bkDrag.fromBoard?0:DRAG_LIFT, px=e.clientX, py=e.clientY-lift;
+  const pv=bkPivot(C.bk.shape), cs=$('bkBoard').getBoundingClientRect().width/C.V.N, u=Math.max(14,cs*1.05);
+  el.style.transform=`translate(${px-(pv[0]+0.5)*u}px, ${py-(pv[1]+0.5)*u}px) scale(1.08)`;
+  const cell=bkCellFromPoint(px, py);
+  if(cell){ const r=bkSnap(cell); const changed=!C.bk.at||C.bk.at[0]!==r.at[0]||C.bk.at[1]!==r.at[1]; C.bk.at=r.at;
+    if(changed){ bkRenderBoard(); if(r.snapped||bkSpots().has(r.at[1]*C.V.N+r.at[0])){ try{ navigator.vibrate && navigator.vibrate(5); }catch(err){} } } }
+  el.classList.toggle('over', !!cell);
+}
+function bkDragEnd(e){
+  if(!bkDrag||e.pointerId!==bkDrag.id) return;
+  const was=bkDrag.started; bkDrag=null; C.bk.dragging=false; $('bkDragEl').hidden=true;
+  if(was){ renderBK(); if(C.bk.at && C.bk.legal) Snd.play(); }
+}
+$('bkTray').addEventListener('pointerdown', e=>{
+  const b=e.target.closest('.bkpc'); if(!b||!C||!C.V||C.V.turn!==C.V.me) return;
+  const pc=+b.dataset.pc; if(C.bk.piece!==pc){ bkSelect(pc); renderBK(); }
+  bkDragStart(e, false);
+});
+$('bkBoard').addEventListener('pointerdown', e=>{
+  const V=C&&C.V; if(!V||V.turn!==V.me||V.over||C.bk.piece==null) return;
+  const c=e.target.closest('i'); if(!c) return;
+  const i=+c.dataset.i, ghost=bkCells();
+  if(ghost && ghost.some(([x,y])=>y*V.N+x===i)){ e.preventDefault(); bkDragStart(e, true); }
+});
+window.addEventListener('pointermove', bkDragMove, {passive:false});
+window.addEventListener('pointerup', bkDragEnd);
+window.addEventListener('pointercancel', bkDragEnd);
+$('bkTray').addEventListener('click', e=>{
+  const b=e.target.closest('.bkpc'); if(!b||!C||!C.V) return;
+  const pc=+b.dataset.pc; if(C.bk.piece===pc && !C.bk.at) return;
+  if(C.bk.piece!==pc){ bkSelect(pc); Snd.tap(); renderBK(); }
+});
+$('bkBoard').addEventListener('click', e=>{
+  const c=e.target.closest('i'); const V=C&&C.V; if(!c||!V||V.turn!==V.me||V.over) return;
+  if(C.bk.piece==null){ toast('先選下面的一塊方塊'); return; }
+  const i=+c.dataset.i, ghost=bkCells();
+  if(ghost && ghost.some(([x,y])=>y*V.N+x===i)) return; // 點在預覽上不移動（避免拖完又被當成點擊）
+  C.bk.at=bkSnap([i%V.N, Math.floor(i/V.N)]).at; Snd.tap(); renderBK();
+});
+$('bkSel').addEventListener('click', ()=>bkTransform(K.rotate));
+$('bkRot').addEventListener('click', ()=>bkTransform(K.rotate));
+$('bkFlip').addEventListener('click', ()=>bkTransform(K.flip));
+$('bkfRot').addEventListener('click', ()=>bkTransform(K.rotate));
+$('bkfFlip').addEventListener('click', ()=>bkTransform(K.flip));
+$('bkfOk').addEventListener('click', bkPlaceNow);
+$('bkfNo').addEventListener('click', ()=>{ C.bk.at=null; Snd.tap(); renderBK(); });
+$('bkHint').addEventListener('click', ()=>{
+  const V=C.V; const m=K.aiChoose(bkLocal(), V.me, 'normal'); if(!m){ toast('沒地方放了'); return; }
+  C.bk.piece=m.piece; C.bk.shape=K.norm(m.cells); const pv=bkPivot(C.bk.shape);
+  const mx=Math.min(...m.cells.map(c=>c[0])), my=Math.min(...m.cells.map(c=>c[1]));
+  C.bk.at=[pv[0]+mx, pv[1]+my]; Snd.tap(); renderBK(); toast('建議放這裡，按 ✓ 確定');
+});
+$('bkPlace').addEventListener('click', bkPlaceNow);
+
+/* ================= 數字組牌 ================= */
+const RM_COL=['#E8433F','#2B66CF','#E58A00','#1B1B3A'];
+function rmTile(id, cls=''){
+  if(R.isJ(id)) return `<span class="rt j ${cls}" data-id="${id}"><b>鬼</b><i>★</i></span>`;
+  return `<span class="rt ${cls}" data-id="${id}" style="--rc:${RM_COL[R.col(id)]}"><b>${R.num(id)}</b><i>●</i></span>`;
+}
+function rmReset(){ const V=C.V; C.rm={ver:V.ver, gid:V.gid, table:V.table.map(s=>s.slice()), rack:V.hand.slice(), sel:[], start:V.table.flat()}; }
+function rmSorted(r){ const m=store.get('jk_rmsort','col');
+  return r.slice().sort(m==='col' ? (a,b)=>(R.col(a)-R.col(b))||(R.num(a)-R.num(b))||a-b : (a,b)=>(R.num(a)-R.num(b))||(R.col(a)-R.col(b))||a-b); }
+function rmAdded(){ const st=new Set(C.rm.start); return C.rm.table.flat().filter(x=>!st.has(x)); }
+function renderRM(){
+  const V=C.V, me=V.me, myTurn=V.turn===me && !V.over;
+  // 自己這回合的擺法只存在自己手機；牌局一有變動（別人出牌、回合換人）就重新對齊
+  if(!C.rm || C.rm.ver!==V.ver || C.rm.gid!==V.gid) rmReset();
+  $('rmPlayers').innerHTML = V.players.map((p,i)=>`<div class="bkp ${V.turn===i&&!V.over?'turn':''} ${i===me?'me':''}">
+    <span class="bkav">${avatar(p.kind)}</span><span class="bkn">${esc(i===me?'我':p.name)}</span>
+    <span class="bkc">${V.counts[i]} 張${V.melded[i]?'':' · 未開門'}</span>${V.status[i]&&V.turn!==i?`<em>${esc(V.status[i])}</em>`:''}${seatTail(V,i)}</div>`).join('');
+  const sel=new Set(C.rm.sel), st=new Set(C.rm.start);
+  const sets=C.rm.table;
+  $('rmTable').innerHTML = (sets.length ? sets.map((s,i)=>{ if(!s.length) return ''; const info=R.analyze(s);
+      return `<div class="rset ${info?'':'bad'}" data-set="${i}">${(info?info.order:s).map(id=>rmTile(id,(sel.has(id)?'sel ':'')+(!st.has(id)?'new':''))).join('')}${myTurn?`<button class="radd" data-add="${i}" aria-label="加到這組">＋</button>`:''}</div>`; }).join('')
+    : '') + (myTurn ? `<button class="rnew" id="rmNewSet" ${sel.size?'':'disabled'}>＋ 用選的牌開新組</button>` : '') +
+    (!sets.some(s=>s.length) && !myTurn ? '<p class="rmempty">桌上還沒有牌</p>' : '');
+  $('rmRack').innerHTML = rmSorted(C.rm.rack).map(id=>rmTile(id, sel.has(id)?'sel':'')).join('') || '<span class="note">手上沒牌了</span>';
+  const added=rmAdded();
+  let info = `牌堆剩 ${V.pool} 張`;
+  if(myTurn && !V.melded[me]){
+    const fresh=sets.filter(s=>s.length && s.every(x=>!st.has(x)));
+    const v=fresh.reduce((a,s)=>{ const z=R.analyze(s); return a+(z?z.value:0); },0);
+    info = `首次出牌：<b class="${v>=30?'up':'down'}">${v}</b> / 30 點 · ` + info;
+  }
+  $('rmInfo').innerHTML = info;
+  const tag = V.over ? '這局結束' : myTurn ? (added.length ? `已放 ${added.length} 張，按「完成」` : '點手牌選起來，再按組旁邊的＋或開新組') : `等 ${esc(V.players[V.turn].name)} 出牌…`;
+  $('rmTag').innerHTML = tag + (myTurn&&V.timed?' <span class="tleft"></span>':'');
+  const allOk = sets.every(s=>!s.length || R.valid(s));
+  $('rmDone').disabled = !myTurn || !added.length || !allOk;
+  $('rmDraw').disabled = !myTurn;
+  $('rmUndo').disabled = !myTurn || (!added.length && !sel.size && JSON.stringify(sets)===JSON.stringify(V.table));
+  $('rmHint').disabled = !myTurn;
+  $('rmSort').textContent = store.get('jk_rmsort','col')==='col' ? '排數字' : '排顏色';
+}
+function rmMoveSel(target){
+  const sel=C.rm.sel; if(!sel.length) return;
+  const V=C.V, st=new Set(C.rm.start);
+  if(!V.melded[V.me] && sel.some(x=>st.has(x))){ toast('第一次出牌只能用自己手上的牌'); Snd.err(); return; }
+  C.rm.rack=C.rm.rack.filter(x=>!sel.includes(x));
+  C.rm.table=C.rm.table.map(s=>s.filter(x=>!sel.includes(x)));
+  if(target==null) C.rm.table.push(sel.slice());
+  else { const s=C.rm.table[target].concat(sel); const z=R.analyze(s); C.rm.table[target]= z ? z.order : s; }
+  C.rm.table=C.rm.table.filter(s=>s.length);
+  C.rm.sel=[]; Snd.play(); renderRM();
+}
+$('rmRack').addEventListener('click', e=>{
+  const t=e.target.closest('.rt'); const V=C&&C.V; if(!t||!V||V.turn!==V.me||V.over) return;
+  const id=+t.dataset.id; C.rm.sel = C.rm.sel.includes(id) ? C.rm.sel.filter(x=>x!==id) : C.rm.sel.concat(id); Snd.tap(); renderRM();
+});
+$('rmTable').addEventListener('click', e=>{
+  const V=C&&C.V; if(!V||V.turn!==V.me||V.over) return;
+  const add=e.target.closest('[data-add]'); if(add){ rmMoveSel(+add.dataset.add); return; }
+  if(e.target.closest('#rmNewSet')){ rmMoveSel(null); return; }
+  const t=e.target.closest('.rt'); if(!t) return;
+  const id=+t.dataset.id, st=new Set(C.rm.start);
+  if(st.has(id) && !V.melded[V.me]){ toast('第一次出牌不能動桌上的牌'); Snd.err(); return; }
+  // 點自己這回合剛放上去的牌：直接收回手上
+  if(!st.has(id) && !C.rm.sel.length){ C.rm.table=C.rm.table.map(s=>s.filter(x=>x!==id)).filter(s=>s.length); C.rm.rack.push(id); Snd.tap(); renderRM(); return; }
+  C.rm.sel = C.rm.sel.includes(id) ? C.rm.sel.filter(x=>x!==id) : C.rm.sel.concat(id); Snd.tap(); renderRM();
+});
+$('rmUndo').addEventListener('click', ()=>{ rmReset(); Snd.tap(); renderRM(); });
+$('rmSort').addEventListener('click', ()=>{ store.set('jk_rmsort', store.get('jk_rmsort','col')==='col'?'num':'col'); Snd.tap(); renderRM(); });
+$('rmDraw').addEventListener('click', ()=>{ rmReset(); sendAct({k:'draw'}); });
+$('rmDone').addEventListener('click', ()=>{ sendAct({k:'commit', table:C.rm.table.filter(s=>s.length)}); });
+$('rmHint').addEventListener('click', ()=>{
+  const V=C.V;
+  const S={racks:{}, table:V.table.map(s=>s.slice()), melded:V.melded}; S.racks[V.me]=V.hand.slice();
+  const m=R.aiChoose(S, V.me, 'normal');
+  if(m.t==='draw'){ rmReset(); renderRM(); toast(V.melded[V.me]?'沒有牌可以出，建議摸牌':'湊不到 30 點，建議摸牌'); return; }
+  const onTable=new Set(m.table.flat());
+  C.rm.table=m.table.map(s=>s.slice()); C.rm.rack=V.hand.filter(x=>!onTable.has(x)); C.rm.sel=[];
+  Snd.tap(); renderRM(); toast('照建議擺好了，按「完成」');
+});
+
 /* ================= 大廳 / 房間 ================= */
 function syncChips(){
   document.querySelectorAll('#nChips .chip').forEach(b=>b.setAttribute('aria-pressed', +b.dataset.n===prefs.n));
   document.querySelectorAll('#dChips .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.d===prefs.diff));
-  $('gBig2').setAttribute('aria-pressed', prefs.game==='big2'); $('gSeven').setAttribute('aria-pressed', prefs.game==='seven'); $('gMJ').setAttribute('aria-pressed', prefs.game==='mj');
+  $('gBig2').setAttribute('aria-pressed', prefs.game==='big2'); $('gSeven').setAttribute('aria-pressed', prefs.game==='seven'); $('gMJ').setAttribute('aria-pressed', prefs.game==='mj'); $('gBK').setAttribute('aria-pressed', prefs.game==='bk'); $('gRM').setAttribute('aria-pressed', prefs.game==='rm');
   document.querySelectorAll('#nChips .chip').forEach(b=>{ b.disabled = prefs.game==='mj'; if(prefs.game==='mj') b.setAttribute('aria-pressed', b.dataset.n==='4'); });
   document.querySelectorAll('#mlChips .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.l===prefs.mjLen));
   $('mlField').hidden = prefs.game!=='mj';
@@ -1329,9 +1631,11 @@ $('dChips').addEventListener('click', e=>{ const b=e.target.closest('.chip'); if
 $('gBig2').addEventListener('click',()=>{ prefs.game='big2'; syncChips(); Snd.init(); Snd.tap(); });
 $('gSeven').addEventListener('click',()=>{ prefs.game='seven'; syncChips(); Snd.init(); Snd.tap(); });
 $('gMJ').addEventListener('click',()=>{ prefs.game='mj'; syncChips(); Snd.init(); Snd.tap(); });
+$('gBK').addEventListener('click',()=>{ prefs.game='bk'; syncChips(); Snd.init(); Snd.tap(); });
+$('gRM').addEventListener('click',()=>{ prefs.game='rm'; syncChips(); Snd.init(); Snd.tap(); });
 $('mlChips').addEventListener('click', e=>{ const b=e.target.closest('.chip'); if(!b) return; prefs.mjLen=b.dataset.l; syncChips(); Snd.init(); Snd.tap(); });
 ['btnSound1','btnSound2'].forEach(id=>$(id).addEventListener('click',()=>{ Snd.on=!Snd.on; store.set('jk_sound',Snd.on); Snd.init(); soundLabel(); Snd.tap(); }));
-$('btnRules').addEventListener('click',()=>{ const g=C&&C.V?C.V.type:prefs.game; $('rulesTitle').textContent=GNAME[g]+'規則'; $('rules2').hidden=g!=='big2'; $('rules7').hidden=g!=='seven'; $('rulesMJ').hidden=g!=='mj'; $('rules').hidden=false; });
+$('btnRules').addEventListener('click',()=>{ const g=C&&C.V?C.V.type:prefs.game; $('rulesTitle').textContent=GNAME[g]+'規則'; $('rules2').hidden=g!=='big2'; $('rules7').hidden=g!=='seven'; $('rulesMJ').hidden=g!=='mj'; $('rulesBK').hidden=g!=='bk'; $('rulesRM').hidden=g!=='rm'; $('rules').hidden=false; });
 $('btnRulesOk').addEventListener('click',()=>$('rules').hidden=true);
 syncChips(); soundLabel(); applyTheme(); renderProfile(); tickerNext();
 
