@@ -2,10 +2,16 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#E6F0FF">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FF5C93">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="牌搭子">
 <meta name="application-name" content="牌搭子">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>牌搭子</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -915,6 +921,383 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
   .g-seven #tableLabel{position:absolute;top:3px;right:10px;z-index:2;font-size:12px}
   .g-seven #board{max-width:min(100%,calc((100dvh - 205px) * 2.2))}
 }
+
+/* ===== 防止 iPhone 點兩下放大 ===== */
+html{touch-action:manipulation;-webkit-text-size-adjust:100%}
+button,.chip,.candy,.card,.tile,.rt,.bkpc,#bkBoard i{touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+/* ===== 倒數時不跳動：提示列固定高度、數字等寬 ===== */
+.tleft{font-variant-numeric:tabular-nums;display:inline-block;min-width:2.2em;box-sizing:border-box}
+.bktag{height:22px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none;box-sizing:border-box;max-width:100%}
+#game.myturn .bktag{padding:0 10px;border-width:2px}
+.rminfo{flex-wrap:nowrap;height:22px;align-items:center;flex:none;min-width:0}
+#rmInfo{flex:none;white-space:nowrap}
+#rmTag{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:18px}
+#game.myturn #rmTag{padding:0 10px}
+.bkps{flex:none;padding-top:8px;margin-top:-6px}
+/* ===== Blokus 棋盤依剩下的空間自動縮放（不會被擠掉、不會跳） ===== */
+.bkwrap{flex:1 1 0;min-height:150px;container-type:size;align-items:flex-start}
+.bkstage{width:min(100cqw,100cqh)}
+.bkstage #bkBoard{width:100%}
+.bkrow,.bkacts,#emoBar{flex:none}
+/* ===== 玩家列：小螢幕只留顏色＋名字＋格數，一行 ===== */
+@media (max-height:820px){
+  .bkp{display:flex;align-items:center;gap:4px;height:28px;padding:0 6px 0 4px;box-sizing:border-box;border-left:7px solid var(--pc,var(--ink))}
+  .bkp .bkav{display:none}
+  .bkp .bkn{flex:1 1 auto;font-size:12px}
+  .bkp .bkc{flex:none;font-size:10px}
+  .bkp .tleft{font-size:10px;padding:0 4px;margin-left:0}
+  .bkp .off{display:none}
+  .bkrow{min-height:0;height:78px}
+  #bkSel{height:74px}
+  .bkpc{min-height:34px;min-width:38px}
+}
+@media (orientation:landscape) and (max-height:560px){
+  .bkwrap{container-type:normal;min-height:0}
+  .bkstage,.bkstage #bkBoard{width:min(calc(100dvh - 58px),52vw)}
+  .bkrow{height:auto}
+}
+
+@media (max-height:820px){
+  .bkp{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:15px 13px;align-items:center;column-gap:3px;row-gap:1px;height:34px;padding:1px 5px 1px 5px}
+  .bkp .bkn{grid-row:1;grid-column:1;font-size:12px;line-height:15px}
+  .bkp .tleft{grid-row:1;grid-column:2;min-width:0;line-height:14px}
+  .bkp .bkc{grid-row:2;grid-column:1/-1;font-size:9.5px;line-height:13px}
+}
+@media (max-height:660px) and (orientation:portrait){
+  #bkSel{display:none}
+  .bkrow{height:52px}
+  #bkTray{grid-template-rows:1fr;align-items:center}
+  .bkpc{min-height:40px}
+  #emoBar button{padding-block:3px}
+  .bkacts .candy{padding:8px 4px}
+}
+
+.bar .candy{white-space:nowrap;flex:none}
+.bar .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-size:clamp(12px,3.7vw,16px);letter-spacing:.04em}
+
+/* ===== 首頁 5 顆按鈕 ===== */
+.quick3{grid-template-columns:repeat(5,1fr);gap:5px}
+.quick3 .candy{font-size:13px;padding:9px 2px}
+.qi-chest{background:#C9853F;border-radius:4px 4px 7px 7px;box-shadow:inset 0 -9px 0 #A0612A}
+.qi-chest:before{content:"";position:absolute;left:-2px;right:-2px;top:6px;height:4px;background:var(--sun);border:1.5px solid var(--ink);border-radius:2px}
+.qi-chest:after{content:"";position:absolute;left:9px;top:9px;width:6px;height:7px;background:var(--sun);border:1.5px solid var(--ink);border-radius:2px}
+.cnt{position:absolute;top:3px;right:calc(50% - 26px);min-width:18px;height:18px;border-radius:99px;background:var(--red);color:#fff;font:700 11px/18px var(--f-num);font-style:normal;box-shadow:0 0 0 2px var(--paper);animation:pulse 1.2s ease-in-out infinite}
+/* ===== 任務難度 ===== */
+.tdiff{font-style:normal;font-size:10.5px;font-weight:900;border-radius:99px;padding:0 6px;margin-right:5px;border:1.5px solid var(--ink);white-space:nowrap}
+.tdiff.d1{background:#D6FFE4}.tdiff.d2{background:#FFF1C2}.tdiff.d3{background:#FFD0DC}
+.taskchest{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;background:#FFF6DA;border:2px dashed var(--ink);border-radius:12px;padding:8px 10px}
+.taskchest.done{background:#D6FFE4;border-style:solid}
+.minichest{width:26px;height:20px;flex:none;border-radius:4px 4px 6px 6px;background:#C9853F;border:2px solid var(--ink);position:relative;box-shadow:inset 0 -7px 0 #A0612A}
+.minichest:after{content:"";position:absolute;left:8px;top:4px;width:6px;height:7px;background:var(--sun);border:1.5px solid var(--ink);border-radius:2px}
+/* ===== 寶箱畫面 ===== */
+.chestrow{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.chest{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--paper);border:2px solid var(--ink);border-radius:14px;padding:8px 5px;box-shadow:3px 3px 0 var(--ink);text-align:center}
+.chest b{font-size:13.5px}
+.chest .ccount{font:700 13px var(--f-num)}
+.chest .candy{width:100%;padding:7px 2px;font-size:13px}
+.chest .candy.small{font-size:11.5px;padding:5px 2px}
+.chest .note{font-size:11px}
+.odds{display:flex;flex-direction:column;font-size:10px;line-height:1.35;font-weight:700}
+.frag{font-family:var(--f-num);color:#7B4BE0;margin-left:6px}
+.pity{font-size:12.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pity .pbar{flex:1;min-width:90px;height:8px;background:#E7E3F3;border-radius:99px;overflow:hidden;border:1.5px solid var(--ink)}
+.pity .pbar i{display:block;height:100%;background:linear-gradient(90deg,#A15BE6,#E3456A)}
+/* 稀有度顏色 */
+.rr-c{color:#7A7F8C}.rr-r{color:#2B66CF}.rr-e{color:#8A3FD6}.rr-l{color:#C98A00}
+.rtag{font-size:10px;font-weight:900;color:#fff!important;border-radius:99px;padding:1px 7px;border:1.5px solid var(--ink)}
+.rtag.rr-c{background:#9AA1AE}.rtag.rr-r{background:#3D7BE0}.rtag.rr-e{background:#9B4FE6}.rtag.rr-l{background:linear-gradient(90deg,#F7C531,#FF9F1C);color:var(--ink)!important}
+.sitem.col{position:relative}
+.sitem.col .rtag{position:absolute;top:-8px;left:6px;z-index:1}
+.sitem.locked .spv{filter:grayscale(.85);opacity:.55}
+.sitem.rr-l{background:linear-gradient(160deg,#FFF8DC,#FFE7A3)}
+.sitem.rr-e{background:linear-gradient(160deg,#F7F0FF,#E8D9FF)}
+/* 寶箱圖 */
+.cbox{--w:58px;--c1:#C9853F;--c2:#A0612A;--band:#F5C443;width:var(--w);height:calc(var(--w)*.8);position:relative;margin-top:6px}
+.cbox.t-r{--c1:#4C86E8;--c2:#2E5FB8;--band:#DDE8FF}
+.cbox.t-e{--c1:#A35BEA;--c2:#7231BE;--band:#FFD54A}
+.cbox .body{position:absolute;left:0;right:0;bottom:0;height:62%;background:var(--c1);border:2.5px solid var(--ink);border-radius:4px 4px 9px 9px;box-shadow:inset 0 -8px 0 var(--c2),inset 0 0 0 4px rgba(255,255,255,.15)}
+.cbox .lid{position:absolute;left:-3%;right:-3%;top:0;height:44%;background:var(--c1);border:2.5px solid var(--ink);border-radius:14px 14px 3px 3px;z-index:2;box-shadow:inset 0 5px 0 rgba(255,255,255,.35),inset 0 -5px 0 var(--band);transform-origin:10% 100%;transition:transform .35s cubic-bezier(.3,1.6,.5,1)}
+.cbox .lock{position:absolute;left:50%;top:32%;width:22%;height:30%;transform:translateX(-50%);background:var(--band);border:2.5px solid var(--ink);border-radius:4px;z-index:3}
+.cbox.has{animation:bob 1.4s ease-in-out infinite}
+.chest .cbox:not(.has){filter:grayscale(.8);opacity:.5}
+/* 開箱 */
+.overlay.chestopen{background:rgba(20,18,45,.82);z-index:60}
+.opstage{position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;cursor:pointer}
+.opbox .cbox{--w:150px}
+.opbox .cbox.shake{animation:cshake .5s ease-in-out infinite}
+@keyframes cshake{0%,100%{transform:rotate(0)}20%{transform:rotate(-7deg) translateY(-4px)}40%{transform:rotate(6deg)}60%{transform:rotate(-4deg) translateY(-2px)}80%{transform:rotate(3deg)}}
+.optip{color:#fff;font-weight:900;font-size:16px;animation:pulse 1s ease-in-out infinite}
+.burst{position:absolute;left:50%;top:45%;width:760px;height:760px;margin:-380px 0 0 -380px;border-radius:50%;pointer-events:none;
+  background:repeating-conic-gradient(var(--glow) 0 8deg,transparent 8deg 22deg);-webkit-mask:radial-gradient(circle,#000 0,transparent 62%);mask:radial-gradient(circle,#000 0,transparent 62%);animation:spin 9s linear infinite,popin .5s ease-out both;opacity:.9}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes popin{from{transform:scale(.2);opacity:0}}
+#ovOpen{--glow:rgba(255,255,255,.35)}
+#ovOpen[data-rar=r]{--glow:rgba(80,150,255,.55)}
+#ovOpen[data-rar=e]{--glow:rgba(180,100,255,.65)}
+#ovOpen[data-rar=l]{--glow:rgba(255,205,60,.85)}
+#ovOpen[data-rar=l] .opcard{box-shadow:0 0 0 4px #FFD54A,0 0 60px 20px rgba(255,200,40,.75),6px 6px 0 var(--ink)}
+#ovOpen[data-rar=e] .opcard{box-shadow:0 0 0 4px #B57BFF,0 0 40px 10px rgba(170,90,255,.6),6px 6px 0 var(--ink)}
+.opcard{position:relative;background:var(--paper);border:3px solid var(--ink);border-radius:22px;padding:18px 18px 14px;min-width:240px;max-width:86vw;display:flex;flex-direction:column;align-items:center;gap:10px;animation:opIn .55s cubic-bezier(.3,1.6,.5,1) both;box-shadow:6px 6px 0 var(--ink)}
+@keyframes opIn{from{transform:scale(.2) rotate(-8deg);opacity:0}}
+.rtag.big{font-size:15px;padding:3px 14px}
+.oprw{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:14px}
+.oprw b{font-size:24px;font-weight:900}
+.oprw .coin{width:40px;height:40px}
+.oprw em{font-style:normal;font-size:12.5px;font-weight:700;color:#7B4BE0}
+.oprw em.new{color:#1C8B50}
+.oprw .spv{transform:scale(1.35);margin:14px 0 10px}
+.opbtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.opbtns .candy{padding:9px 16px}
+.chestline{color:#7231BE!important}
+/* ===== 頭像框 ===== */
+.av[class*=fr-],.pfav[class*=fr-]{position:relative;overflow:visible}
+.fr-silver:before,.fr-sakura:before,.fr-fire:before,.fr-neon:before,.fr-rainbow:before{content:"";position:absolute;inset:-5px;border-radius:50%;pointer-events:none;z-index:2}
+.fr-silver:before{border:3.5px solid #C9D1DE;box-shadow:0 0 0 1.5px var(--ink),inset 0 0 0 1.5px var(--ink)}
+.fr-sakura:before{border:3.5px solid #FF9EC0;box-shadow:0 0 0 1.5px var(--ink),inset 0 0 0 1.5px var(--ink)}
+.fr-sakura:after{content:"🌸";position:absolute;right:-8px;top:-9px;font-size:15px;z-index:3;line-height:1}
+.fr-fire:before{border:3.5px solid #FF7A1A;box-shadow:0 0 0 1.5px var(--ink),0 0 10px 3px rgba(255,110,20,.8);animation:fireglow .8s ease-in-out infinite alternate}
+@keyframes fireglow{to{box-shadow:0 0 0 1.5px var(--ink),0 -4px 16px 6px rgba(255,170,30,.9)}}
+.fr-neon:before{border:3px solid #39F3FF;box-shadow:0 0 6px 2px #39F3FF,inset 0 0 6px 1px #FF4FD8;animation:neonfr 1.6s steps(2) infinite}
+@keyframes neonfr{50%{border-color:#FF4FD8;box-shadow:0 0 8px 3px #FF4FD8,inset 0 0 6px 1px #39F3FF}}
+.fr-rainbow:before{inset:-6px;padding:4px;background:conic-gradient(#FF4F8B,#FFD23F,#3BE07A,#39C2FF,#A15BE6,#FF4F8B);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:spin 2.4s linear infinite;box-shadow:none}
+.fr-rainbow:after{content:"";position:absolute;inset:-9px;border-radius:50%;box-shadow:0 0 14px 4px rgba(255,220,80,.65);pointer-events:none}
+/* ===== 稱號 ===== */
+.ttb{display:inline-block;margin-left:4px;font-size:9.5px;font-weight:900;line-height:1.5;padding:0 5px;border-radius:5px;background:linear-gradient(90deg,#FFE27A,#FFB938);color:var(--ink);border:1.2px solid var(--ink);vertical-align:middle;white-space:nowrap}
+.ttb.big{font-size:14px;padding:2px 10px;margin:0}
+.pname .ttb{font-size:8.5px;padding:0 3px}
+/* ===== 牌背 ===== */
+:root,[data-back]{--bk-bg:var(--pink);--bk-img:radial-gradient(circle,rgba(255,255,255,.7) 1.3px,transparent 1.6px);--bk-size:5px 5px}
+[data-back=navy]{--bk-bg:#2B4C8C;--bk-img:linear-gradient(45deg,rgba(255,255,255,.22) 25%,transparent 25% 75%,rgba(255,255,255,.22) 75%),linear-gradient(-45deg,rgba(255,255,255,.22) 25%,transparent 25% 75%,rgba(255,255,255,.22) 75%);--bk-size:6px 6px}
+[data-back=sakura]{--bk-bg:#FFC2D6;--bk-img:radial-gradient(circle at 30% 30%,#fff 1.2px,transparent 1.8px),radial-gradient(circle at 70% 70%,#FF7FAA 1.6px,transparent 2.2px);--bk-size:8px 8px}
+[data-back=star]{--bk-bg:#1E1F4F;--bk-img:radial-gradient(circle at 20% 30%,#FFE97A 1px,transparent 1.5px),radial-gradient(circle at 70% 60%,#fff .8px,transparent 1.3px),linear-gradient(160deg,#3A2F86,#151640);--bk-size:9px 9px,7px 7px,100% 100%}
+[data-back=gold]{--bk-bg:#C98A00;--bk-img:repeating-linear-gradient(45deg,#FFE27A 0 2px,#E8A700 2px 5px),linear-gradient(#FFD54A,#B87800);--bk-size:auto,100% 100%}
+.mini,.tile.back{background-color:var(--bk-bg)!important;background-image:var(--bk-img)!important;background-size:var(--bk-size)!important}
+.backpv{display:flex;gap:5px;justify-content:center;align-items:center}
+.backpv .mini{width:26px;height:36px;border-radius:5px}
+/* ===== 麻將牌面 ===== */
+[data-tiles=pink] .tile:not(.back){background:#FFF0F5;border-color:#F5B7CC}
+[data-tiles=pink] .tile:not(.back){box-shadow:0 calc(var(--tw)*.09) 0 #F28DB0}
+[data-tiles=jade] .tile:not(.back){background:linear-gradient(160deg,#F2FFF8,#D4F5E3);border-color:#9ED9B8;box-shadow:0 calc(var(--tw)*.09) 0 #2E9E6B}
+[data-tiles=black] .tile:not(.back){background:linear-gradient(160deg,#3A3A48,#1D1D26);border-color:#C9A13B;box-shadow:0 calc(var(--tw)*.09) 0 #8A6A12}
+[data-tiles=black] .tile:not(.back) b,[data-tiles=black] .tile:not(.back) i{filter:brightness(1.6) saturate(1.2)}
+[data-tiles=black] .tile:not(.back) .bai{border-color:#FFD54A}
+.tilepv{display:flex;gap:3px;justify-content:center}
+.tilepv .tile{--tw:24px}
+@media (max-width:360px){.quick3 .candy{font-size:12px}.chest b{font-size:12px}}
+
+/* ===== 聊天＆語音 ===== */
+.tk{flex:none;position:relative;font-size:15px!important;padding-inline:9px!important;background:#fff!important}
+.tk-mic span{font-size:11px;margin-left:2px;font-weight:900}
+.tk-mic.on{background:#2BB673!important;color:#fff;animation:pulse 1.4s ease-in-out infinite}
+.tkb{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:99px;background:var(--red);color:#fff;font:700 10.5px/17px var(--f-num);font-style:normal;text-align:center;box-shadow:0 0 0 2px #fff}
+.talkrow{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.talkrow .tk{font-size:14px!important;padding:8px 14px!important;border:2px solid var(--ink);border-radius:99px;box-shadow:0 3px 0 var(--ink);font-family:var(--f-cute);font-weight:900}
+#chatSheet{position:fixed;left:8px;right:8px;top:max(8px,env(safe-area-inset-top));z-index:45;max-width:560px;margin:0 auto;background:var(--paper);border:3px solid var(--ink);border-radius:18px;box-shadow:5px 5px 0 var(--ink);padding:8px;display:flex;flex-direction:column;gap:6px;max-height:min(56vh,440px);animation:pop .18s ease-out}
+.chhead{display:flex;align-items:center;gap:6px}
+.chhead>b{font-size:15px;flex:none}
+#chatPeople{flex:1;min-width:0;display:flex;gap:4px;overflow-x:auto;align-items:center;scrollbar-width:none}
+#chatPeople .chip{font-size:11.5px;padding:3px 8px;flex:none}
+#chatPeople .chip.muted{opacity:.55;text-decoration:line-through}
+#chatPeople .note{font-size:10px;white-space:nowrap}
+#chatClose{font-size:12px;padding:5px 10px;flex:none}
+#chatLog{flex:1 1 auto;min-height:70px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:2px;overscroll-behavior:contain}
+.cmsg{display:flex;gap:6px;align-items:flex-start}
+.cav{width:26px;height:26px;flex:none;border-radius:50%;border:1.5px solid var(--ink);background:#fff;display:grid;place-items:center;overflow:hidden}
+.cav svg{width:22px;height:22px}
+.cmsg b{font-size:11px;color:var(--ink-soft)}
+.cmsg p{margin:0;font-size:14px;background:#F1F4FF;border:1.5px solid var(--ink);border-radius:4px 12px 12px 12px;padding:3px 9px;word-break:break-word}
+#chatQuick{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:none}
+#chatQuick button{flex:none;font:700 13px var(--f-cute);background:#fff;border:1.5px solid var(--ink);border-radius:99px;padding:3px 9px;touch-action:manipulation}
+#chatForm{display:flex;gap:6px;flex:none}
+#chatIn{flex:1;min-width:0;font-size:16px;padding:8px 10px;border:2px solid var(--ink);border-radius:12px;font-family:inherit}
+#chatForm .candy{padding:8px 14px;font-size:14px}
+.efx.chatb{position:fixed;z-index:38;background:#fff;border:2.5px solid var(--ink);border-radius:14px;padding:5px 10px;font-size:14px;font-weight:700;box-shadow:3px 3px 0 var(--ink);word-break:break-word;animation:pop .2s ease-out,ebOut .4s ease-in 3.8s forwards;pointer-events:none}
+.efx.chatb b{display:block;font-size:10.5px;color:var(--pink-deep)}
+.efx.chatb:after{content:"";position:absolute;left:var(--tx,16px);width:12px;height:12px;background:#fff;border:2.5px solid var(--ink);transform:rotate(45deg)}
+.efx.chatb.down:after{top:-8px;border-right:0;border-bottom:0}
+.efx.chatb.up:after{bottom:-8px;border-left:0;border-top:0}
+#vcRings{position:fixed;inset:0;pointer-events:none;z-index:37}
+.vring{position:absolute;width:0;height:0}
+.vring i{position:absolute;left:12px;top:-30px;font-style:normal;font-size:12px;background:#fff;border:1.5px solid var(--ink);border-radius:99px;width:20px;height:20px;display:grid;place-items:center}
+.vring:before{content:"";position:absolute;left:-26px;top:-26px;width:52px;height:52px;border-radius:50%;border:3px solid transparent;transition:border-color .12s,box-shadow .12s}
+.vring.talk:before{border-color:#2BB673;box-shadow:0 0 12px 4px rgba(43,182,115,.7)}
+.vring.talk i{background:#2BB673;color:#fff}
+.vring.muted i{opacity:.6}
+
+/* ===== 丟道具 ===== */
+.efx.proj{position:fixed;z-index:39;font-size:34px;line-height:1;pointer-events:none;filter:drop-shadow(2px 3px 0 rgba(27,27,58,.35));will-change:transform}
+.efx.thp{position:fixed;z-index:39;font-size:20px;transform:translate(-50%,-50%);animation:thp 1s ease-out forwards;pointer-events:none}
+@keyframes thp{0%{transform:translate(-50%,-50%) scale(.4);opacity:1}100%{transform:translate(calc(-50% + var(--px)),calc(-50% + var(--py))) scale(1.1);opacity:0}}
+.efx.thw{position:fixed;z-index:40;transform:translate(-50%,-150%) rotate(-8deg);font:900 22px var(--f-cute);color:#fff;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;text-shadow:2px 2px 0 var(--ink);animation:thw 1s ease-out forwards;white-space:nowrap;pointer-events:none}
+.efx.thw.big{font-size:34px;color:var(--sun)}
+.efx.thw.pink{color:#FF7FAA}.efx.thw.gold{color:#FFD23F}
+@keyframes thw{0%{transform:translate(-50%,-80%) rotate(-8deg) scale(.3);opacity:0}25%{transform:translate(-50%,-150%) rotate(-8deg) scale(1.25);opacity:1}80%{opacity:1}100%{transform:translate(-50%,-190%) rotate(-8deg) scale(1);opacity:0}}
+.efx.splat{position:fixed;z-index:38;width:74px;height:74px;transform:translate(-50%,-50%);pointer-events:none;animation:splatIn .18s ease-out,splatOut .6s ease-in 2.2s forwards}
+.efx.splat.red{background:radial-gradient(circle at 50% 50%,#E8202B 0 30%,transparent 31%),radial-gradient(circle at 18% 30%,#E8202B 0 11%,transparent 12%),radial-gradient(circle at 82% 28%,#E8202B 0 9%,transparent 10%),radial-gradient(circle at 75% 80%,#E8202B 0 12%,transparent 13%),radial-gradient(circle at 25% 78%,#C8121C 0 8%,transparent 9%),radial-gradient(circle at 55% 35%,#FF6A6A 0 10%,transparent 11%);opacity:.92}
+.efx.splat.egg{background:radial-gradient(circle at 50% 50%,#FFFDF2 0 36%,transparent 37%),radial-gradient(circle at 22% 30%,#FFFDF2 0 12%,transparent 13%),radial-gradient(circle at 80% 70%,#FFFDF2 0 13%,transparent 14%)}
+.efx.splat.egg i{position:absolute;left:36%;top:34%;width:30%;height:30%;border-radius:50%;background:#FFB915;box-shadow:inset -3px -3px 0 #F29500;animation:yolk 2.2s ease-in .3s forwards}
+@keyframes yolk{to{transform:translateY(26px) scaleY(1.3)}}
+.efx.splat.water{background:radial-gradient(circle,rgba(80,170,255,.55) 0 45%,transparent 46%);border-radius:50%}
+@keyframes splatIn{from{transform:translate(-50%,-50%) scale(.2)}}
+@keyframes splatOut{to{opacity:0;transform:translate(-50%,-30%) scale(1.05)}}
+.efx.thboom{position:fixed;z-index:40;font-size:80px;transform:translate(-50%,-50%);animation:thboom .9s ease-out forwards;pointer-events:none}
+@keyframes thboom{0%{transform:translate(-50%,-50%) scale(.2)}30%{transform:translate(-50%,-50%) scale(1.4)}100%{transform:translate(-50%,-50%) scale(1.6);opacity:0}}
+.hitshake{animation:hitshake .45s}
+@keyframes hitshake{20%{transform:translate(-5px,3px) rotate(-8deg)}40%{transform:translate(5px,-2px) rotate(6deg)}60%{transform:translate(-3px,1px) rotate(-3deg)}80%{transform:translate(2px,0)}}
+#throwPick{position:fixed;z-index:46;background:var(--paper);border:2.5px solid var(--ink);border-radius:16px;box-shadow:4px 4px 0 var(--ink);padding:6px 8px;animation:pop .15s ease-out;max-width:300px}
+.tph{font-size:12px;text-align:center;margin-bottom:4px}
+.tpl{display:grid;grid-template-columns:repeat(4,44px);gap:5px;justify-content:center}
+.tpl button{width:44px;height:44px;font-size:26px;border:2px solid var(--ink);border-radius:12px;background:#fff;box-shadow:0 3px 0 var(--ink);touch-action:manipulation;line-height:1}
+.tpl button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.tpshop{display:block;margin:6px auto 0;font:700 11px var(--f-cute);color:var(--ink-soft);background:none;border:0;text-decoration:underline}
+body.aiming .seat .av,body.aiming [id^=mjo] .av,body.aiming #bkPlayers .bkp,body.aiming #rmPlayers .bkp{animation:aimpulse .8s ease-in-out infinite;cursor:crosshair}
+@keyframes aimpulse{50%{box-shadow:0 0 0 4px var(--red),0 0 14px 4px rgba(232,67,63,.6)}}
+.seat .av,[id^=mjo] .av{cursor:pointer}
+.tk-throw.tk{font-size:16px!important}
+.spv.thpv{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.spv.thpv span{font-size:34px;line-height:1.1}
+.spv.thpv small{font-size:10.5px;color:var(--ink-soft)}
+
+/* ===== 加到主畫面 ===== */
+.itip{display:flex;align-items:center;gap:8px;background:#FFF6DA;border:2px solid var(--ink);border-radius:14px;padding:8px 10px;font-size:12.5px;font-weight:700;box-shadow:3px 3px 0 var(--ink)}
+.itip span{flex:1;line-height:1.45}
+.itip .candy{flex:none;padding:7px 12px;font-size:13px}
+.itip .ix{flex:none;border:0;background:none;font-size:16px;color:var(--ink-soft);padding:4px}
+
+/* ===== 吹牛骰子 ===== */
+#dc{display:none;flex:1;min-height:0;flex-direction:column;gap:6px;padding-block:2px 8px}
+.g-dc #dc{display:flex}
+.g-dc #table,.g-dc #me,.g-dc .actions{display:none}
+.g-dc #game{overflow-y:auto}
+.bkc .lost{font-style:normal;opacity:.22}
+#dcTable{flex:1 1 0;min-height:150px;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.12) 0 4deg,transparent 4deg 12deg),var(--felt);border:3px solid var(--ink);border-radius:20px;box-shadow:4px 4px 0 var(--ink);display:flex;align-items:center;justify-content:center;padding:10px;overflow-y:auto}
+#game.myturn #dcTable{animation:myglow 1.1s ease-in-out infinite}
+.dcbid{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.dcbid .who{font-size:13px;font-weight:900;background:rgba(255,255,255,.8);border:2px solid var(--ink);border-radius:99px;padding:2px 12px}
+.dcbid .big{display:flex;align-items:center;gap:8px;background:#fff;border:3px solid var(--ink);border-radius:18px;padding:6px 16px;box-shadow:4px 4px 0 var(--ink);animation:pop .25s ease-out}
+.dcbid .big b{font:700 46px/1 var(--f-num)}
+.dcbid .big span{font-size:18px;font-weight:900}
+.dcbid .big.empty{font-size:18px;font-weight:900;padding:12px 18px}
+.wild{font-size:11.5px;font-weight:900;border-radius:99px;padding:1px 9px;border:1.5px solid var(--ink)}
+.wild.on{background:#D6FFE4}.wild.off{background:#FFE1E4}
+.dclog{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:320px}
+.dclog span{font-size:11px;background:rgba(255,255,255,.65);border-radius:8px;padding:1px 6px;display:inline-flex;align-items:center;gap:2px}
+.die{--s:30px;width:var(--s);height:var(--s);flex:none;display:inline-grid;place-items:center;background:#fff;border:2px solid var(--ink);border-radius:calc(var(--s)*.22);box-shadow:0 calc(var(--s)*.08) 0 #C9BFA4;vertical-align:middle;box-sizing:border-box}
+.die svg{width:88%;height:88%}
+.die.xs{--s:16px;border-width:1.2px;box-shadow:none}
+.die.sm{--s:24px}
+.die.lg{--s:52px;border-width:3px}
+.die.q b{font:700 calc(var(--s)*.6) var(--f-num);color:var(--ink-soft)}
+.die.mine{--s:min(15vw,54px)}
+.die.hit{background:#FFF1C2;box-shadow:0 0 0 3px var(--sun),0 calc(var(--s)*.08) 0 #C9BFA4}
+.die.dim{opacity:.4}
+.die.flip{animation:dflip .45s ease-out both}
+@keyframes dflip{from{transform:rotateY(90deg) scale(.6);opacity:0}}
+#dcMine{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
+.cup{display:flex;gap:6px;justify-content:center}
+.cup.roll .die{animation:droll .7s cubic-bezier(.3,1.4,.5,1) both}
+.cup.roll .die:nth-child(2){animation-delay:.06s}.cup.roll .die:nth-child(3){animation-delay:.12s}.cup.roll .die:nth-child(4){animation-delay:.18s}.cup.roll .die:nth-child(5){animation-delay:.24s}
+@keyframes droll{0%{transform:translateY(-40px) rotate(-200deg) scale(.6);opacity:0}70%{transform:translateY(4px) rotate(10deg)}100%{transform:none}}
+.dchint{font-size:12px;font-weight:700;display:flex;align-items:center;gap:3px}
+#dcCtl{display:flex;flex-direction:column;gap:6px;align-items:center;flex:none;transition:opacity .2s}
+#dcCtl.off{opacity:.45;pointer-events:none}
+.dcq{display:flex;align-items:center;gap:10px}
+.dcq b{font:700 30px/1 var(--f-num);min-width:44px;text-align:center}
+.dcq span{font-weight:900}
+.dcq .candy{width:44px;height:40px;padding:0;font-size:22px}
+.dcf{display:flex;gap:6px;justify-content:center}
+.dcfb{border:2px solid var(--ink);background:#fff;border-radius:12px;padding:4px;box-shadow:0 3px 0 var(--ink);touch-action:manipulation}
+.dcfb.on{background:var(--sun);transform:translateY(-3px)}
+.dcfb .die{--s:30px;box-shadow:none}
+.dcacts{display:grid;grid-template-columns:1fr 1.6fr 1.2fr;gap:7px;flex:none}
+.dcacts .candy{font-size:15px;padding:11px 4px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.dcacts .candy b{font-family:var(--f-num);font-size:18px}
+.candy.red{background:var(--red);color:#fff}
+.candy.red:disabled{background:#F2B8BA}
+.dcres{display:flex;flex-direction:column;align-items:center;gap:6px;background:rgba(255,255,255,.88);border:3px solid var(--ink);border-radius:16px;padding:8px 10px;box-shadow:4px 4px 0 var(--ink);animation:pop .25s ease-out;max-width:100%}
+.dcrh{font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:center}
+.dcall{display:flex;flex-direction:column;gap:4px}
+.dcrow{display:flex;align-items:center;gap:3px}
+.dcrow>span{width:52px;font-size:11.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dcrow .die{--s:26px}
+.dcsum{font-size:13.5px;font-weight:700;text-align:center}
+.dcsum b{font-family:var(--f-num)}
+.dcres.ok .dcsum{color:#137A45}.dcres.bad .dcsum{color:var(--red)}
+@media (max-height:660px) and (orientation:portrait){ #dcTable{min-height:120px} .die.mine{--s:min(13vw,44px)} .dcbid .big b{font-size:36px} .dcacts .candy{padding:8px 4px} }
+@media (orientation:landscape) and (max-height:560px){
+  .g-dc #game{overflow:hidden}
+  .g-dc #dc{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,40%);grid-template-rows:auto minmax(0,1fr) auto auto auto;grid-template-areas:"ps ps" "tbl mine" "tbl ctl" "tbl tag" "tbl acts";column-gap:10px;row-gap:5px;padding-block:0 6px}
+  #dcPlayers{grid-area:ps} #dcTable{grid-area:tbl;min-height:0} #dcMine{grid-area:mine;align-self:end} #dcCtl{grid-area:ctl} #dcTag{grid-area:tag} .dcacts{grid-area:acts}
+  .die.mine{--s:40px} .dcq b{font-size:24px} .dcq .candy{height:34px} .dcfb .die{--s:24px} .dcacts .candy{padding:7px 4px;font-size:13px}
+}
+
+/* ===== 暗棋 ===== */
+#cc,#pr{display:none;flex:1;min-height:0;flex-direction:column;gap:6px;padding-block:2px 8px}
+.g-cc #cc,.g-pr #pr{display:flex}
+.g-cc #table,.g-cc #me,.g-cc .actions,.g-pr #table,.g-pr #me,.g-pr .actions{display:none}
+.g-cc #game,.g-pr #game{overflow-y:auto}
+.ccwrap{flex:1 1 0;min-height:200px;container-type:size;display:flex;justify-content:center;align-items:flex-start}
+#ccBoard{width:min(100cqw,50cqh);aspect-ratio:1/2;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(8,1fr);gap:3px;padding:5px;box-sizing:border-box;background:linear-gradient(160deg,#F4DFB3,#E2C48A);border:3px solid var(--ink);border-radius:14px;box-shadow:4px 4px 0 var(--ink)}
+#game.myturn #ccBoard{animation:myglow 1.1s ease-in-out infinite}
+.cc{position:relative;display:grid;place-items:center;border-radius:8px;background:rgba(255,255,255,.18);border:1.5px solid rgba(140,96,40,.35)}
+.cc.last{background:rgba(255,214,90,.45)}
+.cc.sel{background:rgba(80,180,255,.45);box-shadow:inset 0 0 0 3px #2B66CF}
+.cc.tgo:after{content:"";position:absolute;width:26%;height:26%;border-radius:50%;background:#2BB673;box-shadow:0 0 0 3px #fff,0 0 10px 2px #2BB673;animation:spot 1.1s ease-in-out infinite}
+.cc.tcap{box-shadow:inset 0 0 0 3px var(--red);background:rgba(255,120,120,.35)}
+.cc.hint{animation:pulse .5s ease-in-out 4}
+.ccp{width:86%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;border:2.5px solid var(--ink);box-shadow:0 3px 0 rgba(27,27,58,.45);background:radial-gradient(circle at 40% 35%,#FFFDF3,#F3E2BC);font-family:"Noto Serif TC","Noto Sans TC",serif;transition:transform .15s}
+.ccp b{font-size:min(9cqw,30px);font-weight:900;line-height:1}
+.ccp.red b{color:#D8262E}.ccp.blk b{color:#1B1B3A}
+.ccp.red{box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 5px #E8A0A3,0 3px 0 rgba(27,27,58,.45)}
+.ccp.blk{box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 5px #9AA1AE,0 3px 0 rgba(27,27,58,.45)}
+.ccp.down{background:repeating-linear-gradient(30deg,#B98A47 0 4px,#A8783A 4px 8px);}
+.ccp.down i{width:55%;height:55%;border-radius:50%;border:2px solid rgba(255,240,210,.6)}
+.cc.can .ccp.down{cursor:pointer}
+.cc.sel .ccp{transform:translateY(-4px) scale(1.06)}
+.ccp.flipped{animation:ccflip .4s ease-out}
+.ccp.moved{animation:pop .25s ease-out}
+@keyframes ccflip{0%{transform:rotateY(90deg)}100%{transform:rotateY(0)}}
+#ccCaps{display:flex;flex-direction:column;gap:3px;flex:none;font-size:11.5px;font-weight:700}
+#ccCaps>div{display:flex;align-items:center;gap:3px;flex-wrap:wrap;min-height:22px}
+#ccCaps .cl{width:46px;flex:none;color:var(--ink-soft)}
+.ccp.cm{width:22px;border-width:1.5px;box-shadow:none!important}
+.ccp.cm b{font-size:12px}
+.ccacts,.practs{display:grid;grid-template-columns:1fr;gap:7px;flex:none}
+.practs{grid-template-columns:1fr 2fr}
+.ccacts .candy,.practs .candy{font-size:15px;padding:11px 4px}
+/* ===== 撿紅點 ===== */
+#prTable{flex:1 1 0;min-height:150px;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.12) 0 4deg,transparent 4deg 12deg),var(--felt);border:3px solid var(--ink);border-radius:20px;box-shadow:4px 4px 0 var(--ink);padding:8px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;position:relative}
+#game.myturn #prTable{animation:myglow 1.1s ease-in-out infinite}
+.prpile{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:900}
+.prpile .card.back{position:relative;width:34px;height:48px;border-radius:5px;border:2px solid var(--ink);background:var(--bk-bg);background-image:var(--bk-img);background-size:var(--bk-size);box-shadow:2px 2px 0 var(--ink),4px 4px 0 rgba(27,27,58,.3)}
+.prcards{display:flex;flex-wrap:wrap;gap:6px;padding-right:46px;--cw:44px;--ch:62px}
+.prcards .card.mc{cursor:pointer;transition:transform .12s}
+.prcards .card.match{box-shadow:0 0 0 3px var(--sun),0 0 12px 3px rgba(255,200,0,.8);transform:translateY(-3px);animation:pulse 1s ease-in-out infinite}
+.prlast{margin-top:auto;font-size:12px;font-weight:700;background:rgba(255,255,255,.8);border:2px solid var(--ink);border-radius:10px;padding:3px 8px;display:flex;flex-wrap:wrap;align-items:center;gap:3px;--cw:20px;--ch:28px}
+.prlast em{font-style:normal;color:var(--red);font-weight:900}
+.card.mc.xs .cb{display:none}
+.card.mc.xs .cr{font-size:10px}.card.mc.xs .cs{font-size:9px;top:48%}
+.prpt{font-family:var(--f-num);color:var(--red)}
+#prHand{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;flex:none;--cw:min(13vw,50px);--ch:calc(var(--cw)*1.42);padding-top:6px}
+#prHand .card.mc{cursor:pointer;transition:transform .12s}
+#prHand .card.sel{transform:translateY(-8px);box-shadow:0 0 0 3px var(--pink),2px 3px 0 var(--ink)}
+#prHand .card.can:not(.sel){box-shadow:0 0 0 2px #2BB673,1px 1.5px 0 var(--ink)}
+@media (max-height:660px) and (orientation:portrait){ #prHand{--cw:min(11vw,42px)} .prcards{--cw:38px;--ch:53px} }
+@media (orientation:landscape) and (max-height:560px){
+  .g-cc #game,.g-pr #game{overflow:hidden}
+  .g-cc #cc{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,34%);grid-template-rows:auto minmax(0,1fr) auto auto;grid-template-areas:"brd ps" "brd caps" "brd tag" "brd acts";column-gap:10px;row-gap:5px;padding-block:0 6px}
+  #ccPlayers{grid-area:ps;flex-wrap:wrap} .ccwrap{grid-area:brd;min-height:0;align-items:center} #ccCaps{grid-area:caps} #ccTag{grid-area:tag} .ccacts{grid-area:acts}
+  #ccBoard{width:min(100cqw,200cqh);aspect-ratio:2/1;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(4,1fr)}
+  .cc{grid-row:calc(var(--c) + 1);grid-column:calc(var(--r) + 1)}
+  .ccp b{font-size:min(4.5cqw,26px)}
+  .g-pr #pr{display:grid;grid-template-columns:minmax(0,1fr) 120px;grid-template-rows:auto minmax(0,1fr) auto auto;grid-template-areas:"ps ps" "tbl acts" "tag tag" "hand hand";column-gap:8px;row-gap:4px;padding-block:0 6px}
+  #prPlayers{grid-area:ps} #prTable{grid-area:tbl;min-height:0;padding:5px} #prTag{grid-area:tag} #prHand{grid-area:hand;--cw:29px;padding-top:0;gap:3px} .practs{grid-area:acts;grid-template-columns:1fr;align-content:end}
+  .prcards{--cw:36px;--ch:50px}
+}
+
+.itip.resume{background:#E4F1FF}
+.hwspin{width:46px;height:46px;margin:6px auto;border-radius:50%;border:5px solid #E3E7F5;border-top-color:var(--pink);animation:spin 1s linear infinite}
+#hostWait .result p{margin:6px 0}
 </style>
 
 <div id="app">
@@ -950,8 +1333,12 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
       <button class="candy plain" id="btnStats"><span class="qi qi-stats"></span>戰績<i class="dot" id="dotStats" hidden></i></button>
       <button class="candy plain" id="btnDaily"><span class="qi qi-daily"></span>每日<i class="dot" id="dotDaily" hidden></i></button>
       <button class="candy plain" id="btnShop"><span class="qi qi-shop"></span>商店</button>
+      <button class="candy plain" id="btnChest"><span class="qi qi-chest"></span>寶箱<i class="cnt" id="chestCnt" hidden></i></button>
     </div>
     <div class="ticker" id="ticker" aria-live="off"></div>
+    <div class="itip resume" id="resumeTip" hidden></div>
+    <div class="itip" id="installTip" hidden></div>
+    <div class="itip" id="moveTip" hidden></div>
 
     <div class="panel">
       <div class="field">
@@ -967,6 +1354,9 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
           <button class="gcard" id="gMJ" aria-pressed="false"><i class="gicon"><svg viewBox="0 0 80 52" aria-hidden="true"><rect x="6" y="15" width="20" height="27" rx="4" fill="#2D9E8C" stroke="#1B1B3A" stroke-width="2"/><rect x="6" y="12" width="20" height="27" rx="4" fill="#FFFCF2" stroke="#1B1B3A" stroke-width="2"/><text x="16" y="27" font-size="12" font-weight="900" text-anchor="middle" fill="#1B1B3A">一</text><text x="16" y="36" font-size="8" text-anchor="middle" fill="#E8433F">萬</text><rect x="30" y="11" width="20" height="27" rx="4" fill="#2D9E8C" stroke="#1B1B3A" stroke-width="2"/><rect x="30" y="8" width="20" height="27" rx="4" fill="#FFFCF2" stroke="#1B1B3A" stroke-width="2"/><text x="40" y="27" font-size="14" font-weight="900" text-anchor="middle" fill="#E8433F">中</text><rect x="54" y="15" width="20" height="27" rx="4" fill="#2D9E8C" stroke="#1B1B3A" stroke-width="2"/><rect x="54" y="12" width="20" height="27" rx="4" fill="#FFFCF2" stroke="#1B1B3A" stroke-width="2"/><text x="64" y="31" font-size="14" font-weight="900" text-anchor="middle" fill="#1C8B50">發</text></svg></i><b>麻將</b><span>台灣十六張，固定 4 人</span></button>
           <button class="gcard" id="gBK" aria-pressed="false"><i class="gicon"><svg viewBox="0 0 80 52" aria-hidden="true"><rect x="4" y="2" width="72" height="48" rx="5" fill="#EEF1FB" stroke="#1B1B3A" stroke-width="2"/><rect x="8" y="6" width="8" height="8" rx="1.6" fill="#3B82F6" stroke="#1B1B3A" stroke-width="1.4"/><rect x="16" y="6" width="8" height="8" rx="1.6" fill="#3B82F6" stroke="#1B1B3A" stroke-width="1.4"/><rect x="16" y="14" width="8" height="8" rx="1.6" fill="#3B82F6" stroke="#1B1B3A" stroke-width="1.4"/><rect x="24" y="14" width="8" height="8" rx="1.6" fill="#3B82F6" stroke="#1B1B3A" stroke-width="1.4"/><rect x="24" y="22" width="8" height="8" rx="1.6" fill="#3B82F6" stroke="#1B1B3A" stroke-width="1.4"/><rect x="54" y="8" width="8" height="8" rx="1.6" fill="#F5B700" stroke="#1B1B3A" stroke-width="1.4"/><rect x="54" y="16" width="8" height="8" rx="1.6" fill="#F5B700" stroke="#1B1B3A" stroke-width="1.4"/><rect x="62" y="16" width="8" height="8" rx="1.6" fill="#F5B700" stroke="#1B1B3A" stroke-width="1.4"/><rect x="54" y="24" width="8" height="8" rx="1.6" fill="#F5B700" stroke="#1B1B3A" stroke-width="1.4"/><rect x="54" y="32" width="8" height="8" rx="1.6" fill="#F5B700" stroke="#1B1B3A" stroke-width="1.4"/><rect x="38" y="26" width="8" height="8" rx="1.6" fill="#EF4444" stroke="#1B1B3A" stroke-width="1.4"/><rect x="30" y="34" width="8" height="8" rx="1.6" fill="#EF4444" stroke="#1B1B3A" stroke-width="1.4"/><rect x="38" y="34" width="8" height="8" rx="1.6" fill="#EF4444" stroke="#1B1B3A" stroke-width="1.4"/><rect x="46" y="34" width="8" height="8" rx="1.6" fill="#EF4444" stroke="#1B1B3A" stroke-width="1.4"/><rect x="8" y="38" width="8" height="8" rx="1.6" fill="#22B35A" stroke="#1B1B3A" stroke-width="1.4"/><rect x="16" y="38" width="8" height="8" rx="1.6" fill="#22B35A" stroke="#1B1B3A" stroke-width="1.4"/><rect x="24" y="38" width="8" height="8" rx="1.6" fill="#22B35A" stroke="#1B1B3A" stroke-width="1.4"/></svg></i><b>Blokus</b><span>角對角搶地盤，2～4 人</span></button>
           <button class="gcard" id="gRM" aria-pressed="false"><i class="gicon"><svg viewBox="0 0 80 52" aria-hidden="true"><rect x="3" y="15" width="18" height="26" rx="4" fill="#C9BFA4"/><rect x="3" y="13" width="18" height="26" rx="4" fill="#FFFCF2" stroke="#1B1B3A" stroke-width="2"/><text x="12" y="29" font-size="12" font-weight="700" font-family="Fredoka,sans-serif" text-anchor="middle" fill="#E8433F">7</text><circle cx="12" cy="34" r="1.6" fill="#E8433F"/><rect x="23" y="15" width="18" height="26" rx="4" fill="#C9BFA4"/><rect x="23" y="13" width="18" height="26" rx="4" fill="#FFFCF2" stroke="#1B1B3A" stroke-width="2"/><text x="32" y="29" font-size="12" font-weight="700" font-family="Fredoka,sans-serif" text-anchor="middle" fill="#2B66CF">7</text><circle cx="32" cy="34" r="1.6" fill="#2B66CF"/><rect x="43" y="15" width="18" height="26" rx="4" fill="#C9BFA4"/><rect x="43" y="13" width="18" height="26" rx="4" fill="#FFFCF2" stroke="#1B1B3A" stroke-width="2"/><text x="52" y="29" font-size="12" font-weight="700" font-family="Fredoka,sans-serif" text-anchor="middle" fill="#E58A00">7</text><circle cx="52" cy="34" r="1.6" fill="#E58A00"/><rect x="61" y="8" width="18" height="26" rx="4" fill="#C9BFA4"/><rect x="61" y="6" width="18" height="26" rx="4" fill="#FFFCF2" stroke="#1B1B3A" stroke-width="2"/><text x="70" y="22" font-size="12" font-weight="700" font-family="Fredoka,sans-serif" text-anchor="middle" fill="#C42A64">★</text><circle cx="70" cy="27" r="1.6" fill="#C42A64"/></svg></i><b>拉密</b><span>湊組和順，先出完的贏</span></button>
+          <button class="gcard" id="gDC" aria-pressed="false"><i class="gicon"><svg viewBox="0 0 80 52" aria-hidden="true"><path d="M8 44 Q10 22 22 18 L50 18 Q62 22 64 44 Z" fill="#E8433F" stroke="#1B1B3A" stroke-width="2" stroke-linejoin="round"/><rect x="10" y="40" width="52" height="7" rx="3" fill="#B5252B" stroke="#1B1B3A" stroke-width="2"/><g transform="rotate(-12 58 18)"><rect x="47" y="6" width="22" height="22" rx="5" fill="#fff" stroke="#1B1B3A" stroke-width="2"/><circle cx="58" cy="17" r="3.2" fill="#E8433F"/></g><g transform="rotate(10 69 36)"><rect x="59" y="26" width="19" height="19" rx="4.5" fill="#fff" stroke="#1B1B3A" stroke-width="2"/><circle cx="64" cy="31" r="2" fill="#1B1B3A"/><circle cx="73" cy="40" r="2" fill="#1B1B3A"/><circle cx="68.5" cy="35.5" r="2" fill="#1B1B3A"/></g><text x="22" y="36" font-size="13" font-weight="900" fill="#fff" font-family="sans-serif">吹</text></svg></i><b>吹牛骰子</b><span>喊數量、抓吹牛，2～4 人</span></button>
+          <button class="gcard" id="gCC" aria-pressed="false"><i class="gicon"><svg viewBox="0 0 80 52" aria-hidden="true"><rect x="4" y="3" width="72" height="46" rx="6" fill="#F1D9A8" stroke="#1B1B3A" stroke-width="2"/><path d="M4 26H76M22 3V49M40 3V49M58 3V49" stroke="#B98A47" stroke-width="1.5"/><circle cx="13" cy="15" r="8" fill="#C9A06A" stroke="#1B1B3A" stroke-width="2"/><circle cx="31" cy="37" r="8" fill="#C9A06A" stroke="#1B1B3A" stroke-width="2"/><circle cx="49" cy="15" r="9" fill="#FFF7E6" stroke="#1B1B3A" stroke-width="2"/><text x="49" y="19.5" font-size="11" font-weight="900" text-anchor="middle" fill="#E8433F">帥</text><circle cx="67" cy="37" r="9" fill="#FFF7E6" stroke="#1B1B3A" stroke-width="2"/><text x="67" y="41.5" font-size="11" font-weight="900" text-anchor="middle" fill="#1B1B3A">車</text></svg></i><b>暗棋</b><span>象棋翻翻棋，固定 2 人</span></button>
+          <button class="gcard" id="gPR" aria-pressed="false"><i class="gicon"><svg viewBox="0 0 80 52" aria-hidden="true"><g transform="rotate(-10 24 27)"><rect x="12" y="12" width="22" height="30" rx="4" fill="#fff" stroke="#1B1B3A" stroke-width="2"/><text x="16" y="24" font-size="10" font-weight="700" font-family="Fredoka,sans-serif" fill="#E8433F">3</text><text x="23" y="37" font-size="11" text-anchor="middle" fill="#E8433F">♥</text></g><text x="40" y="32" font-size="14" font-weight="900" text-anchor="middle" fill="#1B1B3A">+</text><g transform="rotate(10 56 27)"><rect x="45" y="12" width="22" height="30" rx="4" fill="#fff" stroke="#1B1B3A" stroke-width="2"/><text x="49" y="24" font-size="10" font-weight="700" font-family="Fredoka,sans-serif" fill="#E8433F">7</text><text x="56" y="37" font-size="11" text-anchor="middle" fill="#E8433F">♦</text></g><circle cx="70" cy="9" r="7" fill="#FFD23F" stroke="#1B1B3A" stroke-width="1.6"/><text x="70" y="12.5" font-size="8" font-weight="900" text-anchor="middle" fill="#1B1B3A">10</text></svg></i><b>撿紅點</b><span>湊 10 點撿紅牌，2～4 人</span></button>
         </div>
       </div>
       <div class="field">
@@ -1019,10 +1409,11 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
       <button class="candy sun" id="btnCopy">複製邀請（貼到 LINE）</button>
       <div class="stat" id="linkText"></div>
       <div id="lobbySeats"></div>
+      <div class="talkrow" id="lobbyTalk"></div>
     </div>
     <div class="panel" id="lobbyCtl" hidden>
       <div class="field"><span class="lbl">玩什麼</span>
-        <div class="chips" id="lgChips"><button class="chip" data-g="big2">大老二</button><button class="chip" data-g="seven">排七</button><button class="chip" data-g="mj">麻將</button><button class="chip" data-g="bk">Blokus</button><button class="chip" data-g="rm">拉密</button></div></div>
+        <div class="chips" id="lgChips"><button class="chip" data-g="big2">大老二</button><button class="chip" data-g="seven">排七</button><button class="chip" data-g="mj">麻將</button><button class="chip" data-g="bk">Blokus</button><button class="chip" data-g="rm">拉密</button><button class="chip" data-g="dc">吹牛骰子</button><button class="chip" data-g="cc">暗棋</button><button class="chip" data-g="pr">撿紅點</button></div></div>
       <div class="field" id="llField" hidden><span class="lbl">麻將打多久</span>
         <div class="chips" id="llChips"><button class="chip" data-l="one">單局</button><button class="chip" data-l="round">東風圈</button><button class="chip" data-l="full">一將</button></div></div>
       <div class="field"><span class="lbl">幾個人（不夠的由電腦補）</span>
@@ -1081,6 +1472,35 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
         <button class="candy plain" id="rmDraw">摸牌</button>
         <button class="candy" id="rmDone">完成</button>
       </div>
+    </div>
+    <div id="dc">
+      <div class="bkps" id="dcPlayers"></div>
+      <div id="dcTable"></div>
+      <div class="bktag" id="dcTag"></div>
+      <div id="dcMine"></div>
+      <div id="dcCtl">
+        <div class="dcq"><button class="candy plain" id="dcMinus" aria-label="少一個">−</button><b id="dcQ">3</b><span>個</span><button class="candy plain" id="dcPlus" aria-label="多一個">＋</button></div>
+        <div class="dcf" id="dcFaces"></div>
+      </div>
+      <div class="dcacts">
+        <button class="candy sun" id="dcHint">提示</button>
+        <button class="candy" id="dcBidBtn">喊</button>
+        <button class="candy red" id="dcOpen">開！</button>
+      </div>
+    </div>
+    <div id="cc">
+      <div class="bkps" id="ccPlayers"></div>
+      <div class="ccwrap"><div id="ccBoard"></div></div>
+      <div class="bktag" id="ccTag"></div>
+      <div id="ccCaps"></div>
+      <div class="ccacts"><button class="candy sun" id="ccHint">提示</button></div>
+    </div>
+    <div id="pr">
+      <div class="bkps" id="prPlayers"></div>
+      <div id="prTable"></div>
+      <div class="bktag" id="prTag"></div>
+      <div id="prHand"></div>
+      <div class="practs"><button class="candy sun" id="prHint">提示</button><button class="candy" id="prPlay">先選一張牌</button></div>
     </div>
     <div id="me">
       <div class="meinfo">
@@ -1144,6 +1564,31 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
       ・放不下就自動跳過，大家都放不下時結束。<br>
       ・計分：剩下的每一格扣 1 分；全部放完 +15，最後一塊是單格再 +5。分數高的贏。<br>
       ・操作：選方塊 → 點棋盤上想放的位置 → 用「旋轉」「翻面」調整 → 綠色代表可以放，按「放下」。
+    </p>
+    <p class="note" id="rulesCC" style="color:var(--ink)" hidden>
+      ・2 人玩。32 顆象棋全部蓋著洗亂，排在 4×8 的棋盤上。<br>
+      ・輪到你：翻開一顆，或移動自己翻開的棋子一格（上下左右）到空格或吃對方。<br>
+      ・第一個翻棋的人，翻到什麼顏色就是那一方。<br>
+      ・大小：帥將 &gt; 仕士 &gt; 相象 &gt; 俥車 &gt; 傌馬 &gt; 炮包 &gt; 兵卒。大的或同級可以吃；但兵卒可以吃帥將，帥將不能吃兵卒。<br>
+      ・炮包走一格，但要吃子時必須隔一顆棋（翻開或蓋著都算）跳過去吃，距離不限，什麼棋都能吃。<br>
+      ・吃光對方，或對方沒棋可走就贏。連續 50 步沒有人翻棋也沒有吃子，就比剩下的子力。<br>
+      ・操作：點蓋著的棋就翻開；點自己的棋，再點亮起來的格子走過去（紅色是可以吃）。
+    </p>
+    <p class="note" id="rulesPR" style="color:var(--ink)" hidden>
+      ・2～4 人，52 張。2 人每人 12 張、3 人 8 張、4 人 6 張，桌上翻開 4 張，其他當牌堆。<br>
+      ・輪到你出一張牌，跟桌上的牌湊對就撿走：A～9 兩張加起來是 10（A+9、2+8、3+7、4+6、5+5）；10、J、Q、K 要同點數才能撿。湊不到就把牌放到桌上。<br>
+      ・出完牌，自動翻牌堆最上面一張：能湊對也撿走，不能就留在桌上。<br>
+      ・只算撿到的紅牌（♥♦）：A 20 分、2～9 照點數、10 J Q K 各 10 分，黑牌 0 分。手牌全部出完就結束，分數高的贏。<br>
+      ・操作：點一張手牌，桌上能湊的牌會亮起來；點亮起來的牌就撿，或按下面的按鈕。再點一次同一張手牌也會直接出。
+    </p>
+    <p class="note" id="rulesDC" style="color:var(--ink)" hidden>
+      ・每人 5 顆骰子、3 條命（❤❤❤）。每輪大家一起搖，只看得到自己的。<br>
+      ・輪流喊「全場有 N 個 X 點」，例如「4 個 5」。下一個人要喊更大：數量更多，或數量一樣但點數更大（點數大小 2 &lt; 3 &lt; 4 &lt; 5 &lt; 6 &lt; 1）。<br>
+      ・第一口至少要喊「人數」個（2 人至少 2 個）。<br>
+      ・1 是萬用，可以當任何點數；但這輪只要有人喊過「1」，1 就不再萬用。<br>
+      ・覺得上一個人吹牛，就按「開！」。全部掀開來數：數量夠，喊的人贏、開的人扣一條命；不夠，喊的人扣一條命。<br>
+      ・輸的人下一輪先喊。命扣光就出局，最後留下的人第一名。<br>
+      ・小技巧：下面會顯示你手上有幾個目前選的點數（含萬用 1），再想想其他人大概有多少。
     </p>
     <p class="note" id="rulesRM" style="color:var(--ink)" hidden>
       ・1～13 四種顏色各兩副，加 2 張鬼牌，共 106 張，每人先拿 14 張。<br>
@@ -1226,8 +1671,9 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
     <span class="lbl">連續簽到</span>
     <div class="cigrid" id="ciGrid"></div>
     <button class="candy sun" id="btnCheckin">簽到</button>
-    <span class="lbl">今日任務（每天換）</span>
+    <span class="lbl">今日任務（每天換，簡單／普通／困難各一個）</span>
     <div class="tasks" id="taskList"></div>
+    <div class="taskchest" id="taskChest"></div>
     <button class="candy plain" data-close>關閉</button>
   </div>
 </div>
@@ -1235,12 +1681,37 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 <div class="overlay" id="ovShop" hidden>
   <div class="result sheet">
     <div class="shophead"><h2>商店</h2><span class="pfcoins" id="shopCoins"></span></div>
-    <div class="chips center" id="shopTabs"><button class="chip" data-t="avatar">頭像</button><button class="chip" data-t="table">牌桌</button><button class="chip" data-t="emo">嘴砲</button><button class="chip" data-t="fx">特效</button></div>
+    <div class="chips center" id="shopTabs"><button class="chip" data-t="avatar">頭像</button><button class="chip" data-t="table">牌桌</button><button class="chip" data-t="emo">嘴砲</button><button class="chip" data-t="fx">特效</button><button class="chip" data-t="throw">道具</button></div>
     <div class="sgrid" id="shopGrid"></div>
     <p class="note">金幣怎麼來：贏牌、連勝（最多 ×3）、跟朋友連線（×1.5）、麻將胡牌、每日簽到和任務。</p>
     <button class="candy" data-close>關閉</button>
   </div>
 </div>
+
+<div class="overlay" id="ovChest" hidden>
+  <div class="result sheet">
+    <div class="shophead"><h2>寶箱</h2><span class="pfcoins" id="chestCoins"></span></div>
+    <div class="chestrow" id="chestRow"></div>
+    <div class="pity" id="pityBar"></div>
+    <span class="lbl">寶箱限定收藏 · <span id="fragCnt"></span></span>
+    <div class="chips center" id="colTabs"><button class="chip" data-t="frame">頭像框</button><button class="chip" data-t="title">稱號</button><button class="chip" data-t="back">牌背</button><button class="chip" data-t="tiles">麻將牌</button></div>
+    <div class="sgrid" id="colGrid"></div>
+    <p class="note">怎麼拿寶箱：每日任務全部領完送普通寶箱；每連勝 3 場送稀有寶箱；第一次升上新段位送史詩寶箱；也可以用金幣買。開到已經有的東西會換成碎片 ◆，碎片可以換指定的收藏。頭像框和稱號連線時朋友看得到；牌背和麻將牌是自己畫面上的樣式。</p>
+    <button class="candy" data-close>關閉</button>
+  </div>
+</div>
+<div class="overlay chestopen" id="ovOpen" hidden><div class="opstage" id="opStage"></div></div>
+
+<div id="chatSheet" hidden>
+  <div class="chhead"><b>聊天</b><div id="chatPeople"></div><button class="candy plain" id="chatClose">收起</button></div>
+  <div id="chatLog"></div>
+  <div id="chatQuick"><button>👍</button><button>😂</button><button>😭</button><button>😡</button><button>🙏</button><button>🔥</button><button>等一下</button><button>再一局！</button><button>我先去忙</button></div>
+  <form id="chatForm"><input id="chatIn" maxlength="30" autocomplete="off" enterkeyhint="send" placeholder="說點什麼（最多 30 字）"><button class="candy" type="submit">送出</button></form>
+</div>
+<div id="vcRings" aria-hidden="true"></div>
+<div id="throwPick" hidden></div>
+<div class="overlay" id="hostWait" hidden><div class="result sheet" style="text-align:center"><div class="hwspin"></div><p id="hwText">跟房主斷線了，等他回來…</p><p class="note">房主回來後會自動接著打，不用做任何事。</p><button class="candy plain" id="hwLeave">不等了，回大廳</button></div></div>
+<div id="vcAudio" hidden></div>
 
 <div id="bkDragEl" hidden></div>
 <div id="rmDragEl" hidden></div>
@@ -1248,14 +1719,17 @@ html[data-table=night] .brow .bs.red{color:#FF9DB5}
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="fx"></div>
 
-<script src="peerjs.min.js?v=202610222355"></script>
-<script src="engine.js?v=202610222355"></script>
-<script src="seven.js?v=202610222355"></script>
-<script src="mahjong.js?v=202610222355"></script>
-<script src="blokus.js?v=202610222355"></script>
-<script src="rummi.js?v=202610222355"></script>
-<script src="progress.js?v=202610222355"></script>
-<script src="app.js?v=202610222355"></script>
+<script src="peerjs.min.js?v=202610271914"></script>
+<script src="engine.js?v=202610271914"></script>
+<script src="seven.js?v=202610271914"></script>
+<script src="mahjong.js?v=202610271914"></script>
+<script src="blokus.js?v=202610271914"></script>
+<script src="rummi.js?v=202610271914"></script>
+<script src="dice.js?v=202610271914"></script>
+<script src="darkchess.js?v=202610271914"></script>
+<script src="pickred.js?v=202610271914"></script>
+<script src="progress.js?v=202610271914"></script>
+<script src="app.js?v=202610271914"></script>
 
 </body>
 </html>

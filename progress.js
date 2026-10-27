@@ -49,23 +49,84 @@
     { id: 'fx_cutin', cat: 'fx', name: '動漫登場', price: 900, desc: '大頭像斜切登場' },
     { id: 'fx_neon', cat: 'fx', name: '霓虹燈', price: 1200, desc: '夜店霓虹閃爍字' },
     { id: 'fx_gold', cat: 'fx', name: '黃金降臨', price: 2500, desc: '金字＋金幣雨' },
+    // 丟道具：點別人的頭像丟過去
+    { id: 'th_tomato', cat: 'throw', name: '番茄', price: 0, icon: '🍅', desc: '啪！滿臉番茄醬' },
+    { id: 'th_rose', cat: 'throw', name: '玫瑰', price: 0, icon: '🌹', desc: '送你一朵花' },
+    { id: 'th_egg', cat: 'throw', name: '雞蛋', price: 200, icon: '🥚', desc: '蛋黃流下來' },
+    { id: 'th_heart', cat: 'throw', name: '愛心', price: 300, icon: '💖', desc: '愛心爆開' },
+    { id: 'th_slipper', cat: 'throw', name: '藍白拖', price: 400, icon: '🩴', desc: '啪一聲打下去' },
+    { id: 'th_water', cat: 'throw', name: '潑水', price: 500, icon: '💦', desc: '冷靜一下' },
+    { id: 'th_beer', cat: 'throw', name: '乾杯', price: 600, icon: '🍺', desc: '敬你一杯' },
+    { id: 'th_bomb', cat: 'throw', name: '炸彈', price: 900, icon: '💣', desc: '轟！畫面震動' },
   ];
+  /* ---------- 寶箱限定（商店買不到，只能開寶箱或用碎片換） ---------- */
+  const RAR = { r: { name: '稀有', frag: 15, dup: 3 }, e: { name: '史詩', frag: 40, dup: 8 }, l: { name: '傳說', frag: 100, dup: 20 } };
+  const CHEST_ITEMS = [
+    { id: 'bk_classic', cat: 'back', name: '經典粉點', price: 0, look: 'classic' },
+    { id: 'bk_navy', cat: 'back', name: '深藍格紋', rar: 'r', look: 'navy' },
+    { id: 'bk_sakura', cat: 'back', name: '櫻花牌背', rar: 'r', look: 'sakura' },
+    { id: 'bk_star', cat: 'back', name: '星空牌背', rar: 'e', look: 'star' },
+    { id: 'bk_gold', cat: 'back', name: '黃金龍紋', rar: 'l', look: 'gold' },
+    { id: 'fr_none', cat: 'frame', name: '沒有框', price: 0, look: 'none' },
+    { id: 'fr_silver', cat: 'frame', name: '銀色框', rar: 'r', look: 'silver' },
+    { id: 'fr_sakura', cat: 'frame', name: '櫻花框', rar: 'r', look: 'sakura' },
+    { id: 'fr_fire', cat: 'frame', name: '火焰框', rar: 'e', look: 'fire' },
+    { id: 'fr_neon', cat: 'frame', name: '霓虹框', rar: 'e', look: 'neon' },
+    { id: 'fr_rainbow', cat: 'frame', name: '彩虹流光框', rar: 'l', look: 'rainbow' },
+    { id: 'tt_none', cat: 'title', name: '不戴稱號', price: 0, text: '' },
+    { id: 'tt_newbie', cat: 'title', name: '快樂牌友', rar: 'r', text: '快樂牌友' },
+    { id: 'tt_night', cat: 'title', name: '夜貓子', rar: 'r', text: '夜貓子' },
+    { id: 'tt_mouth', cat: 'title', name: '嘴砲王', rar: 'r', text: '嘴砲王' },
+    { id: 'tt_bomb', cat: 'title', name: '炸彈魔', rar: 'e', text: '炸彈魔' },
+    { id: 'tt_seven', cat: 'title', name: '排七大師', rar: 'e', text: '排七大師' },
+    { id: 'tt_tsumo', cat: 'title', name: '自摸王', rar: 'e', text: '自摸王' },
+    { id: 'tt_god', cat: 'title', name: '雀神', rar: 'l', text: '雀神' },
+    { id: 'tt_king', cat: 'title', name: '牌桌之王', rar: 'l', text: '牌桌之王' },
+    { id: 'ti_classic', cat: 'tiles', name: '經典麻將', price: 0, look: 'classic' },
+    { id: 'ti_pink', cat: 'tiles', name: '粉嫩麻將', rar: 'r', look: 'pink' },
+    { id: 'ti_jade', cat: 'tiles', name: '翡翠麻將', rar: 'e', look: 'jade' },
+    { id: 'ti_black', cat: 'tiles', name: '黑金麻將', rar: 'l', look: 'black' },
+  ];
+  CHEST_ITEMS.forEach(x => { if (x.rar) { x.chest = true; x.frag = RAR[x.rar].frag; } SHOP.push(x); });
+  // 寶箱：每種寶箱開出各稀有度的機率（%）。普通 = 金幣
+  const CHESTS = {
+    c: { name: '普通寶箱', price: 300, odds: { c: 60, r: 28, e: 10, l: 2 } },
+    r: { name: '稀有寶箱', price: 900, odds: { c: 0, r: 70, e: 24, l: 6 } },
+    e: { name: '史詩寶箱', price: null, odds: { c: 0, r: 0, e: 80, l: 20 } },
+  };
+  const PITY = 10; // 連開 10 個沒出史詩以上，第 10 個保底史詩
   const item = id => SHOP.find(x => x.id === id);
 
   /* ---------- 每日 ---------- */
   const CHECKIN = [50, 60, 80, 100, 120, 150, 300];
+  // 難度 d：1 簡單 50、2 普通 100、3 困難 200；每天各抽一個
+  const TASK_REWARD = { 1: 50, 2: 100, 3: 200 };
   const TASKS = [
-    { id: 'play3', text: '玩 3 局（任何遊戲）', goal: 3, reward: 80 },
-    { id: 'win1', text: '拿下 1 次第一名', goal: 1, reward: 100 },
-    { id: 'big2win', text: '大老二拿第一名', goal: 1, reward: 100 },
-    { id: 'big2bomb', text: '大老二打出 1 次炸彈', goal: 1, reward: 120 },
-    { id: 'sevenlow', text: '排七蓋牌 10 點以下', goal: 1, reward: 100 },
-    { id: 'mjhu', text: '麻將胡 2 把', goal: 2, reward: 120 },
-    { id: 'mjtsumo', text: '麻將自摸 1 次', goal: 1, reward: 150 },
-    { id: 'mjtai', text: '麻將胡一把 3 台以上', goal: 1, reward: 150 },
-    { id: 'online1', text: '跟朋友連線玩 1 局', goal: 1, reward: 150 },
-    { id: 'streak2', text: '連勝 2 場', goal: 1, reward: 150 },
+    { id: 'play3', d: 1, text: '玩 3 局（任何遊戲）', goal: 3 },
+    { id: 'online1', d: 1, text: '跟朋友連線玩 1 局', goal: 1 },
+    { id: 'bkplay', d: 1, text: '玩 1 局 Blokus', goal: 1 },
+    { id: 'rmplay', d: 1, text: '玩 1 局拉密', goal: 1 },
+    { id: 'dcplay', d: 1, text: '玩 1 局吹牛骰子', goal: 1 },
+    { id: 'dcwin', d: 2, text: '吹牛骰子拿第一名', goal: 1 },
+    { id: 'ccplay', d: 1, text: '玩 1 局暗棋', goal: 1 },
+    { id: 'prplay', d: 1, text: '玩 1 局撿紅點', goal: 1 },
+    { id: 'ccwin', d: 2, text: '暗棋贏 1 局', goal: 1 },
+    { id: 'prwin', d: 2, text: '撿紅點拿第一名', goal: 1 },
+    { id: 'mjplay', d: 2, text: '打完 1 將麻將', goal: 1 },
+    { id: 'win1', d: 2, text: '拿下 1 次第一名', goal: 1 },
+    { id: 'big2win', d: 2, text: '大老二拿第一名', goal: 1 },
+    { id: 'sevenlow', d: 2, text: '排七蓋牌 10 點以下', goal: 1 },
+    { id: 'mjhu', d: 2, text: '麻將胡 2 把', goal: 2 },
+    { id: 'bkwin', d: 2, text: 'Blokus 拿第一名', goal: 1 },
+    { id: 'rm4', d: 2, text: '拉密一回合出 4 張以上', goal: 1 },
+    { id: 'big2bomb', d: 3, text: '大老二打出 1 次炸彈', goal: 1 },
+    { id: 'mjtsumo', d: 3, text: '麻將自摸 1 次', goal: 1 },
+    { id: 'mjtai', d: 3, text: '麻將胡一把 3 台以上', goal: 1 },
+    { id: 'streak2', d: 3, text: '連勝 2 場', goal: 1 },
+    { id: 'bkall', d: 3, text: 'Blokus 21 塊全部放完', goal: 1 },
+    { id: 'rmwin', d: 3, text: '拉密拿第一名', goal: 1 },
   ];
+  TASKS.forEach(t => { t.reward = TASK_REWARD[t.d]; });
   const taskDef = id => TASKS.find(t => t.id === id);
 
   /* ---------- 成就（一次性，解鎖就送金幣） ---------- */
@@ -93,7 +154,7 @@
     { id: 'top1', name: '天下第一', desc: '拿下全服第一', cat: 'rank', goal: 1, reward: 3000, val: S => (S.st.bestRank === 1 ? 1 : 0) },
     { id: 'fr10', name: '揪咖王', desc: '跟朋友連線玩 10 局', cat: 'play', goal: 10, reward: 300, val: S => S.st.online },
   ];
-  const newStats = () => ({ byGame: { big2: { g: 0, w: 0, places: [0, 0, 0, 0] }, seven: { g: 0, w: 0, places: [0, 0, 0, 0] }, mj: { g: 0, w: 0, places: [0, 0, 0, 0] }, bk: { g: 0, w: 0, places: [0, 0, 0, 0] }, rm: { g: 0, w: 0, places: [0, 0, 0, 0] } },
+  const newStats = () => ({ byGame: { big2: { g: 0, w: 0, places: [0, 0, 0, 0] }, seven: { g: 0, w: 0, places: [0, 0, 0, 0] }, mj: { g: 0, w: 0, places: [0, 0, 0, 0] }, bk: { g: 0, w: 0, places: [0, 0, 0, 0] }, rm: { g: 0, w: 0, places: [0, 0, 0, 0] }, dc: { g: 0, w: 0, places: [0, 0, 0, 0] }, cc: { g: 0, w: 0, places: [0, 0, 0, 0] }, pr: { g: 0, w: 0, places: [0, 0, 0, 0] } },
     coinsEarned: 0, peakRp: START_RP, bestRank: null, bombs: 0, sevenClean: 0, mjHu: 0, mjTsumo: 0, mjMaxTai: 0, mjBest: null, online: 0, rpHist: [START_RP], h2h: {}, firstDay: null, days: 0, lastDay: null });
 
   function rng(seed) {
@@ -109,6 +170,13 @@
     return { v: 1, coins: 200, rp: START_RP, streak: 0, best: 0, games: 0, wins: 0, born: now, seed: Math.floor(Math.random() * 1e9),
       owned: ['av_pup', 'av_frog', 'av_chick', 'tb_mint', 'em_basic'], equip: { avatar: 'av_pup', table: 'tb_mint', emo: 'em_basic', fx: 'fx_bubble' },
       checkin: { last: null, day: 0 }, daily: null, lastRank: null, friends: {}, log: [] };
+  }
+  function migrate(P) {
+    ['bk_classic', 'fr_none', 'tt_none', 'ti_classic', 'th_tomato', 'th_rose'].forEach(id => { if (!P.owned.includes(id)) P.owned.push(id); });
+    P.equip.back = P.equip.back || 'bk_classic'; P.equip.frame = P.equip.frame || 'fr_none';
+    P.equip.title = P.equip.title || 'tt_none'; P.equip.tiles = P.equip.tiles || 'ti_classic';
+    if (!P.chests) { P.chests = { c: 1, r: 0, e: 0 }; P.pity = 0; P.frags = 0; P.chestLog = []; } // 送一個普通寶箱當見面禮
+    if (P.peakTier == null) P.peakTier = tierOf(P.rp).i;
   }
   function create(storage, nowFn) {
     const now = nowFn || (() => Date.now());
@@ -127,21 +195,21 @@
     if (!P.ach) P.ach = {};
     if (!P.owned.includes('fx_bubble')) P.owned.push('fx_bubble');
     if (!P.equip.fx) P.equip.fx = 'fx_bubble';
-    ['bk', 'rm'].forEach(g => { if (!P.st.byGame[g]) P.st.byGame[g] = { g: 0, w: 0, places: [0, 0, 0, 0] }; });
+    migrate(P);
+    ['bk', 'rm', 'dc', 'cc', 'pr'].forEach(g => { if (!P.st.byGame[g]) P.st.byGame[g] = { g: 0, w: 0, places: [0, 0, 0, 0] }; });
     const save = () => { try { storage.setItem(KEY, JSON.stringify(P)); } catch (e) {} };
 
     function daily() {
       const k = dayKey(now());
       if (!P.daily || P.daily.date !== k) {
-        const r = rng(hashStr(k) ^ P.seed), pool = TASKS.map(t => t.id), pick = [];
-        while (pick.length < 3) { const i = Math.floor(r() * pool.length); pick.push(pool.splice(i, 1)[0]); }
-        P.daily = { date: k, tasks: pick.map(id => ({ id, n: 0, claimed: false })) };
+        const r = rng(hashStr(k) ^ P.seed), pick = [1, 2, 3].map(d => { const pool = TASKS.filter(t => t.d === d); return pool[Math.floor(r() * pool.length)].id; });
+        P.daily = { date: k, tasks: pick.map(id => ({ id, n: 0, claimed: false })), chest: false };
         save();
       }
       return P.daily;
     }
     function bumpTask(id, by) {
-      const d = daily(), t = d.tasks.find(x => x.id === id);
+      const d = daily(), t = d.tasks.find(x => x.id === id && taskDef(x.id));
       if (!t || t.claimed) return;
       t.n = Math.min(taskDef(id).goal, t.n + (by || 1));
     }
@@ -207,7 +275,18 @@
       if (e.game === 'seven' && e.sevenPts != null && e.sevenPts <= 10) bumpTask('sevenlow');
       if (e.online) bumpTask('online1');
       if (P.streak >= 2) bumpTask('streak2');
+      if (e.game === 'bk') { bumpTask('bkplay'); if (win) bumpTask('bkwin'); if (e.bkAll) bumpTask('bkall'); }
+      if (e.game === 'rm') { bumpTask('rmplay'); if (win) bumpTask('rmwin'); }
+      if (e.game === 'mj') bumpTask('mjplay');
+      if (e.game === 'cc') { bumpTask('ccplay'); if (win) bumpTask('ccwin'); }
+      if (e.game === 'pr') { bumpTask('prplay'); if (win) bumpTask('prwin'); }
+      if (e.game === 'dc') { bumpTask('dcplay'); if (win) bumpTask('dcwin'); }
+      if (e.rm4) bumpTask('rm4');
+      // 寶箱：每連勝 3 場送稀有寶箱；第一次升到新段位送史詩寶箱
+      const gotChests = [];
+      if (win && P.streak > 0 && P.streak % 3 === 0) { P.chests.r++; gotChests.push({ t: 'r', why: `連勝 ${P.streak} 場` }); }
       const after = { rp: P.rp, tier: tierOf(P.rp), rank: myRank() };
+      if (after.tier.i > P.peakTier) { P.peakTier = after.tier.i; P.chests.e++; gotChests.push({ t: 'e', why: `升上${after.tier.name}` }); }
       // 累積戰績
       const st = P.st, bg = st.byGame[e.game] || st.byGame.big2, dk = dayKey(now());
       bg.g++; bg.places[e.place] = (bg.places[e.place] || 0) + 1; if (win) bg.w++;
@@ -225,7 +304,7 @@
       if (easy < 1) lines.push(['簡單電腦 ×0.7', null]);
       if (easy > 1) lines.push(['困難電腦 ×1.3', null]);
       const unlocked = checkAch();
-      const res = { coins, lines, rpd, before, after, streak: P.streak, tierUp: after.tier.i > before.tier.i, tierDown: after.tier.i < before.tier.i, unlocked };
+      const res = { coins, lines, rpd, before, after, streak: P.streak, tierUp: after.tier.i > before.tier.i, tierDown: after.tier.i < before.tier.i, unlocked, chests: gotChests };
       P.lastRank = after.rank;
       P.log.unshift({ t: now(), game: e.game, place: e.place, n, coins, rpd }); P.log = P.log.slice(0, 30);
       save();
@@ -278,18 +357,60 @@
     function claimTask(id) {
       const t = daily().tasks.find(x => x.id === id);
       if (!t || t.claimed || t.n < taskDef(id).goal) return null;
-      t.claimed = true; P.coins += taskDef(id).reward; save();
-      return { coins: taskDef(id).reward };
+      t.claimed = true; P.coins += taskDef(id).reward;
+      const d = daily(); let chest = false;
+      if (!d.chest && d.tasks.every(x => x.claimed)) { d.chest = true; P.chests.c++; chest = true; }
+      save();
+      return { coins: taskDef(id).reward, chest };
     }
     function hasClaimable() { return !checkinState().done || tasks().some(t => t.done && !t.claimed); }
+
+    /* ---------- 寶箱 ---------- */
+    const rand = () => { try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; } catch (e) { return Math.random(); } };
+    function chestState() {
+      return { chests: Object.assign({}, P.chests), pity: P.pity, pityMax: PITY, frags: P.frags,
+        defs: CHESTS, rar: RAR, collection: CHEST_ITEMS.filter(x => x.chest).map(x => Object.assign({}, x, { owned: P.owned.includes(x.id) })) };
+    }
+    function buyChest(t) {
+      const c = CHESTS[t]; if (!c || c.price == null) return { err: '這個寶箱買不到' };
+      if (P.coins < c.price) return { err: `金幣不夠，還差 ${c.price - P.coins}` };
+      P.coins -= c.price; P.chests[t]++; save(); return { ok: true };
+    }
+    function openChest(t) {
+      const c = CHESTS[t]; if (!c || !(P.chests[t] > 0)) return { err: '沒有這種寶箱' };
+      P.chests[t]--;
+      let rar, x = rand() * 100;
+      for (const k of ['l', 'e', 'r', 'c']) { if (x < c.odds[k]) { rar = k; break; } x -= c.odds[k]; }
+      rar = rar || 'c';
+      const pityHit = P.pity + 1 >= PITY && (rar === 'c' || rar === 'r');
+      if (pityHit) rar = 'e';
+      P.pity = (rar === 'e' || rar === 'l') ? 0 : P.pity + 1;
+      const out = { chest: t, rar, pity: pityHit };
+      if (rar === 'c') { out.coins = 30 + Math.floor(rand() * 13) * 10; P.coins += out.coins; P.st.coinsEarned += out.coins; }
+      else {
+        const pool = CHEST_ITEMS.filter(i => i.rar === rar), it = pool[Math.floor(rand() * pool.length)];
+        out.item = { id: it.id, name: it.name, cat: it.cat };
+        if (P.owned.includes(it.id)) { out.dup = true; out.frags = RAR[rar].dup; P.frags += out.frags; }
+        else P.owned.push(it.id);
+      }
+      P.chestLog.unshift({ t: now(), chest: t, rar, id: out.item && out.item.id, coins: out.coins }); P.chestLog = P.chestLog.slice(0, 30);
+      save(); return out;
+    }
+    function fragBuy(id) {
+      const it = item(id); if (!it || !it.chest) return { err: '找不到這個東西' };
+      if (P.owned.includes(id)) return { err: '已經有了' };
+      if (P.frags < it.frag) return { err: `碎片不夠，還差 ${it.frag - P.frags}` };
+      P.frags -= it.frag; P.owned.push(id); P.equip[it.cat] = id; save(); return { ok: true };
+    }
 
     /* ---------- 商店 ---------- */
     function buy(id) {
       const it = item(id);
       if (!it) return { err: '找不到這個東西' };
+      if (it.chest) return { err: '這是寶箱限定，只能開寶箱或用碎片換' };
       if (P.owned.includes(id)) return { err: '已經有了' };
       if (P.coins < it.price) return { err: `金幣不夠，還差 ${it.price - P.coins}` };
-      P.coins -= it.price; P.owned.push(id); P.equip[it.cat] = id; save();
+      P.coins -= it.price; P.owned.push(id); if (it.cat !== 'throw') P.equip[it.cat] = id; save();
       return { ok: true };
     }
     function equip(id) {
@@ -312,7 +433,7 @@
         const d = JSON.parse(UNB64(m[1]));
         const np = d && d.p;
         if (!np || np.v !== 1 || typeof np.coins !== 'number' || typeof np.rp !== 'number' || !Array.isArray(np.owned)) return { err: '備份碼不完整，請整段重新複製' };
-        P = np; if (!P.ach) P.ach = {}; if (!P.st) P.st = newStats();
+        P = np; if (!P.ach) P.ach = {}; if (!P.st) P.st = newStats(); migrate(P);
         P.lastBackup = now(); save();
         return { ok: true, nick: d.nick || '', at: d.at };
       } catch (e) { return { err: '備份碼讀不出來，請確認有整段複製' }; }
@@ -332,12 +453,15 @@
       theme: () => (item(P.equip.table) || item('tb_mint')).theme,
       emoLines: () => (item(P.equip.emo) || item('em_basic')).lines,
       fxId: () => (item(P.equip.fx) ? P.equip.fx : 'fx_bubble'),
-      card: () => ({ rp: P.rp, kind: (item(P.equip.avatar) || item('av_pup')).kind, wins: P.wins }),
+      card: () => ({ rp: P.rp, kind: (item(P.equip.avatar) || item('av_pup')).kind, wins: P.wins, fr: (item(P.equip.frame) || {}).look || 'none', tt: (item(P.equip.title) || {}).text || '' }),
+      backLook: () => (item(P.equip.back) || {}).look || 'classic', tilesLook: () => (item(P.equip.tiles) || {}).look || 'classic',
+      frameLook: () => (item(P.equip.frame) || {}).look || 'none', titleText: () => (item(P.equip.title) || {}).text || '',
+      chestState, buyChest, openChest, fragBuy, throws: () => SHOP.filter(x => x.cat === 'throw' && P.owned.includes(x.id)).map(x => ({ id: x.id, icon: x.icon, name: x.name })), chestCount: () => P.chests.c + P.chests.r + P.chests.e,
       exportCode, importCode, markBackup: () => { P.lastBackup = now(); save(); }, needBackup: () => P.games >= 3 && (!P.lastBackup || now() - P.lastBackup > 7 * 86400000),
     };
   }
 
-  const API = { create, TIERS, tierOf, SHOP, TASKS, CHECKIN, ACH, streakMult };
+  const API = { create, TIERS, tierOf, SHOP, TASKS, CHECKIN, ACH, streakMult, CHESTS, RAR, PITY };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.Progress = API;
 })(this);
